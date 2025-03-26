@@ -1,2 +1,5 @@
 target/*
-/target/*
+./target/debug/*
+dog/target/*
+dog/target
+*.o

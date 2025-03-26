@@ -23,7 +23,12 @@ fn main() -> parquet::errors::Result<()> {
 
     let mut iterator = reader.get_row_iter(None).unwrap();
     while let Some(row) = iterator.next() {
-        println!("{:?}", row.unwrap())
+        let values: Vec<String> = row.unwrap()
+            .get_column_iter()
+            .map(|(_, value)| format!("{}", value))
+            .collect();
+
+        println!("{:?}", values.join(" "));
     };
     
     Ok(())
