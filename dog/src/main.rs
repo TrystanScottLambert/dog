@@ -1,10 +1,10 @@
+use clap::{Arg, ArgAction, Command};
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::fs::File;
 use std::path::Path;
 use std::process::exit;
 
-fn print_all_data(reader: SerializedFileReader<File>) {
-    // prints all the column data.
+fn print_only_data(reader: &SerializedFileReader<File>) {
     let mut iterator = reader.get_row_iter(None).unwrap();
     while let Some(row) = iterator.next() {
         let values: Vec<String> = row
@@ -13,11 +13,10 @@ fn print_all_data(reader: SerializedFileReader<File>) {
             .map(|(_, value)| format!("{}", value))
             .collect();
         println!("{}", values.join(" "));
-    };
+    }
 }
 
-fn print_columns(reader: SerializedFileReader<File>) {
-    // Only prints the column information.
+fn print_column_names(reader: &SerializedFileReader<File>) {
     let mut iterator = reader.get_row_iter(None).unwrap();
     let column_names: Vec<String> = iterator
         .next()
@@ -26,33 +25,68 @@ fn print_columns(reader: SerializedFileReader<File>) {
         .get_column_iter()
         .map(|(value, _)| format!("{}", value))
         .collect();
-
-    println!("{}", column_names.join("\n"))
+    println!("{}", column_names.join("\n"));
 }
 
-fn read_parquet_file(file_name: String) -> SerializedFileReader<File> {
-    // reads the parquet file and creates a reader object for analysis.
-    let file = match File::open(Path::new(&file_name)) {
+fn print_columns_and_data(reader: SerializedFileReader<File>) {
+    print_column_names(&reader);
+    print_only_data(&reader);
+}
+
+fn read_parquet_file(file_name: &str) -> SerializedFileReader<File> {
+    let file = match File::open(Path::new(file_name)) {
         Ok(file) => file,
         Err(e) => {
-            eprintln!("Error. File might not exist. Exiting with error {}", e);
+            eprintln!("Error opening file: {}", e);
             exit(1);
         }
     };
 
-    let reader = match SerializedFileReader::new(file) {
+    match SerializedFileReader::new(file) {
         Ok(reader) => reader,
         Err(e) => {
-            eprintln!("Error converting to Readable format: {e}");
+            eprintln!("Error reading parquet file: {e}");
             exit(1);
         }
-    };
-    reader
+    }
 }
 
 fn main() -> parquet::errors::Result<()> {
-    let infile = String::from("../../waves_wide_missingcols_bp0p1p0.parquet");
-    let reader = read_parquet_file(infile);
-    print_columns(reader);
+    let matches = Command::new("dog")
+        .about("Parquet File Reader CLI")
+        .arg(
+            Arg::new("file")
+                .required(true)
+                .help("Input parquet file"),
+        )
+        .arg(
+            Arg::new("columns")
+                .short('c')
+                .long("columns")
+                .help("Prints only column names")
+                .action(ArgAction::SetTrue) // 👈 Fix: Explicitly set action
+                .conflicts_with("data"),
+        )
+        .arg(
+            Arg::new("data")
+                .short('d')
+                .long("data")
+                .help("Prints only the data")
+                .action(ArgAction::SetTrue) // 👈 Fix: Explicitly set action
+                .conflicts_with("columns"),
+        )
+        .get_matches();
+
+    let file = matches.get_one::<String>("file").expect("File argument missing");
+    let reader = read_parquet_file(file);
+
+    if *matches.get_one::<bool>("columns").unwrap_or(&false) {
+        print_column_names(&reader);
+    } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
+        print_only_data(&reader);
+    } else {
+        print_columns_and_data(reader);
+    }
+
     Ok(())
 }
