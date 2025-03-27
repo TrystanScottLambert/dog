@@ -1,5 +1,6 @@
 target/*
 ./target/debug/*
-dog/target/*
-dog/target
+./dog/target/*
+./dog/target
 *.o
+./dog/target/debug/deps/*
