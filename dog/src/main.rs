@@ -16,7 +16,12 @@ fn print_only_data(reader: &SerializedFileReader<File>) {
     }
 }
 
-fn print_column_names(reader: &SerializedFileReader<File>) {
+enum PrintFormat {
+    Row,
+    Column,
+}
+
+fn print_column_names(reader: &SerializedFileReader<File>, layout: PrintFormat) {
     let mut iterator = reader.get_row_iter(None).unwrap();
     let column_names: Vec<String> = iterator
         .next()
@@ -25,11 +30,15 @@ fn print_column_names(reader: &SerializedFileReader<File>) {
         .get_column_iter()
         .map(|(value, _)| format!("{}", value))
         .collect();
-    println!("{}", column_names.join("\n"));
+    match layout {
+        PrintFormat::Column => println!("{}", column_names.join("\n")),
+        PrintFormat::Row => println!("{}", column_names.join("\n")),
+    };
+    
 }
 
 fn print_columns_and_data(reader: SerializedFileReader<File>) {
-    print_column_names(&reader);
+    print_column_names(&reader, PrintFormat::Row);
     print_only_data(&reader);
 }
 
@@ -124,7 +133,7 @@ fn main() -> parquet::errors::Result<()> {
     let reader = read_parquet_file(file);
 
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
-        print_column_names(&reader);
+        print_column_names(&reader, PrintFormat::Column);
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
         print_only_data(&reader);
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
