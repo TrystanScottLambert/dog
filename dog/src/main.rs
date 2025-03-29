@@ -48,6 +48,7 @@ fn print_tail(reader: &SerializedFileReader<File>) {
 
 
 fn print_head(reader: SerializedFileReader<File>) {
+    
     let iterator = reader.get_row_iter(None).unwrap();
     for row in iterator.take(10) {
         let values: Vec<String> = row
@@ -86,11 +87,11 @@ fn main() -> parquet::errors::Result<()> {
                 .help("Input parquet file"),
         )
         .arg(
-            Arg::new("columns")
+            Arg::new("names")
                 .short('n')
                 .long("names")
                 .help("Prints only column names")
-                .action(ArgAction::SetTrue) // 👈 Fix: Explicitly set action
+                .action(ArgAction::SetTrue)
                 .conflicts_with("data"),
         )
         .arg(
@@ -98,7 +99,7 @@ fn main() -> parquet::errors::Result<()> {
                 .short('d')
                 .long("data")
                 .help("Prints only the data")
-                .action(ArgAction::SetTrue) // 👈 Fix: Explicitly set action
+                .action(ArgAction::SetTrue)
                 .conflicts_with("names"),
         )
         .arg (
@@ -127,7 +128,7 @@ fn main() -> parquet::errors::Result<()> {
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
         print_only_data(&reader);
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-        print_tail(reader);
+        print_tail(&reader);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
         print_head(reader);
     } else {
