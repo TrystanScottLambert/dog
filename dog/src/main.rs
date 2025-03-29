@@ -16,6 +16,12 @@ fn print_only_data(reader: &SerializedFileReader<File>) {
     }
 }
 
+
+fn print_metadata(reader: &SerializedFileReader<File>) {
+    let metadata = reader.metadata();
+    println!("{:?}", metadata);
+}
+
 enum PrintFormat {
     Row,
     Column,
@@ -32,7 +38,7 @@ fn print_column_names(reader: &SerializedFileReader<File>, layout: PrintFormat) 
         .collect();
     match layout {
         PrintFormat::Column => println!("{}", column_names.join("\n")),
-        PrintFormat::Row => println!("{}", column_names.join("\n")),
+        PrintFormat::Row => println!("{}", column_names.join(" ")),
     };
     
 }
@@ -57,7 +63,7 @@ fn print_tail(reader: &SerializedFileReader<File>) {
 
 
 fn print_head(reader: SerializedFileReader<File>) {
-    
+    print_column_names(&reader, PrintFormat::Row);
     let iterator = reader.get_row_iter(None).unwrap();
     for row in iterator.take(10) {
         let values: Vec<String> = row
@@ -123,9 +129,16 @@ fn main() -> parquet::errors::Result<()> {
             Arg::new("head")
             .short('H')
             .long("head")
-            .help("Prints the top 10 rows of data")
+            .help("Prints the top ten rows of data")
             .action(ArgAction::SetTrue)
             .conflicts_with("tail")
+        )
+        .arg(
+            Arg::new("META")
+            .short('M')
+            .long("META")
+            .help("Forcefully prints all metadata without any formatting.")
+            .action(ArgAction::SetTrue)
         )
         .get_matches();
 
@@ -140,6 +153,8 @@ fn main() -> parquet::errors::Result<()> {
         print_tail(&reader);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
         print_head(reader);
+    } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
+        print_metadata(&reader);
     } else {
         print_columns_and_data(reader);
     }
