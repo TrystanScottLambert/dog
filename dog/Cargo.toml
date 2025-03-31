@@ -1,5 +1,5 @@
 [package]
-name = "dogcrate"
+name = "dog"
 version = "0.1.0"
 edition = "2021"
 
