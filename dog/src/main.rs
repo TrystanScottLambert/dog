@@ -16,7 +16,6 @@ fn print_only_data(reader: &SerializedFileReader<File>) {
     }
 }
 
-
 fn print_metadata(reader: &SerializedFileReader<File>) {
     let metadata = reader.metadata();
     println!("{:?}", metadata);
@@ -61,7 +60,6 @@ fn print_tail(reader: &SerializedFileReader<File>) {
     }
 }
 
-
 fn print_head(reader: SerializedFileReader<File>) {
     print_column_names(&reader, PrintFormat::Row);
     let iterator = reader.get_row_iter(None).unwrap();
@@ -74,6 +72,59 @@ fn print_head(reader: SerializedFileReader<File>) {
         println!("{}", values.join(" "))
     }
 }
+
+fn print_selected_columns(reader: &SerializedFileReader<File>, columns: Vec<String>) {
+    let mut iterator = reader.get_row_iter(None).unwrap();
+
+    // Get column names from the first row
+    let first_row = iterator.next().unwrap().unwrap();
+    let column_names: Vec<String> = first_row
+        .get_column_iter()
+        .map(|(name, _)| name.to_string())
+        .collect();
+
+    // Determine which columns to extract (indices)
+    let selected_indices: Vec<usize> = columns
+        .iter()
+        .filter_map(|col| {
+            if let Ok(idx) = col.parse::<usize>() {
+                if idx < column_names.len() {
+                    Some(idx) // Column index case
+                } else {
+                    None // Ignore invalid indices
+                }
+            } else {
+                column_names.iter().position(|name| name == col) // Column name case
+            }
+        })
+        .collect();
+
+    if selected_indices.is_empty() {
+        eprintln!("No valid columns selected!");
+        exit(1);
+    }
+
+    // Print selected column headers
+    println!("{}", selected_indices.iter().map(|&i| column_names[i].clone()).collect::<Vec<String>>().join(" "));
+
+    // Print selected column data for each row
+    for row in reader.get_row_iter(None).unwrap() {
+        let row = row.unwrap();
+        let values: Vec<String> = row
+            .get_column_iter()
+            .enumerate()
+            .filter_map(|(idx, (_, value))| {
+                if selected_indices.contains(&idx) {
+                    Some(format!("{}", value))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        println!("{}", values.join(" "));
+    }
+}
+ 
 
 fn read_parquet_file(file_name: &str) -> SerializedFileReader<File> {
     let file = match File::open(Path::new(file_name)) {
@@ -93,12 +144,14 @@ fn read_parquet_file(file_name: &str) -> SerializedFileReader<File> {
     }
 }
 
+
 fn main() -> parquet::errors::Result<()> {
     let matches = Command::new("dog")
         .about("Parquet File Reader CLI")
         .arg(
             Arg::new("file")
                 .required(true)
+                .index(1) // this will always be the first positional argument
                 .help("Input parquet file"),
         )
         .arg(
@@ -140,6 +193,14 @@ fn main() -> parquet::errors::Result<()> {
             .help("Forcefully prints all metadata without any formatting.")
             .action(ArgAction::SetTrue)
         )
+        .arg(
+            Arg::new("columns")
+            .short('c')
+            .long("columns")
+            .help("Prints only the selected columns by name or index")
+            .num_args(1..)
+            .value_delimiter(',')
+        )
         .get_matches();
 
     let file = matches.get_one::<String>("file").expect("File argument missing");
@@ -155,6 +216,9 @@ fn main() -> parquet::errors::Result<()> {
         print_head(reader);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_metadata(&reader);
+    } else if let Some(columns) = matches.get_many::<String>("columns") {
+        let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
+        print_selected_columns(&reader, columns);
     } else {
         print_columns_and_data(reader);
     }
