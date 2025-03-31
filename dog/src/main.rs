@@ -126,6 +126,41 @@ fn print_selected_columns(reader: &SerializedFileReader<File>, columns: Vec<Stri
 }
  
 
+fn print_summary(reader: &SerializedFileReader<File>) {
+    let mut iterator = reader.get_row_iter(None).unwrap();
+    
+    // Get column names
+    let first_row = iterator.next().unwrap().unwrap();
+    let column_names: Vec<String> = first_row.get_column_iter().map(|(name, _)| name.to_string()).collect();
+    
+    // Store column data
+    let mut column_data: Vec<Vec<String>> = vec![vec![]; column_names.len()];
+    let mut row_count = 1;  // First row already read
+
+    for row in iterator {
+        let row = row.unwrap();
+        for (i, (_, value)) in row.get_column_iter().enumerate() {
+            if column_data[i].len() < 5 {  // Limit to 5 samples
+                column_data[i].push(format!("{}", value));
+            }
+        }
+        row_count += 1;
+    }
+
+    // Print row and column count
+    println!("Rows: {}, Columns: {}", row_count, column_names.len());
+
+    // Print each column summary
+    for (name, data) in column_names.iter().zip(column_data.iter()) {
+        let display_data = if data.len() == 5 {
+            format!("[{}, {}, ..., {}, {}]", data[0], data[1], data[3], data[4])
+        } else {
+            format!("[{}]", data.join(", "))
+        };
+        println!("{} {}", name, display_data);
+    }
+}
+
 fn read_parquet_file(file_name: &str) -> SerializedFileReader<File> {
     let file = match File::open(Path::new(file_name)) {
         Ok(file) => file,
@@ -201,6 +236,13 @@ fn main() -> parquet::errors::Result<()> {
             .num_args(1..)
             .value_delimiter(',')
         )
+        .arg(
+            Arg::new("summary")
+            .short('s')
+            .long("summary")
+            .help("Prints a summary of the Parquet file")
+            .action(ArgAction::SetTrue)
+        )
         .get_matches();
 
     let file = matches.get_one::<String>("file").expect("File argument missing");
@@ -219,6 +261,8 @@ fn main() -> parquet::errors::Result<()> {
     } else if let Some(columns) = matches.get_many::<String>("columns") {
         let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
         print_selected_columns(&reader, columns);
+    } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
+        print_summary(&reader);
     } else {
         print_columns_and_data(reader);
     }
