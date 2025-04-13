@@ -2,13 +2,13 @@ mod printer;
 mod reader;
 mod cli;
 
+use std::fmt::Debug;
 use std::process::Output;
 use std::time::Instant;
 use crate::printer::*;
 use polars::prelude::*;
 use crate::reader::read_parquet_file;
 use crate::reader::read_parquet_file_polars;
-use crate::printer::print_summary;
 use crate::printer::print_summary_polars;
 use std::fs::File;
 use clap::ArgMatches;
@@ -22,9 +22,9 @@ fn handle_arguments(matches: ArgMatches, reader: SerializedFileReader<File>, dat
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
         print_only_data(&reader);
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-        print_tail(&reader);
+        print_tail_polars(data_frame);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
-        print_head(reader);
+        print_head_polars(data_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_metadata(&reader);
     } else if let Some(columns) = matches.get_many::<String>("columns") {
@@ -37,6 +37,7 @@ fn handle_arguments(matches: ArgMatches, reader: SerializedFileReader<File>, dat
     }
 }
 
+
 fn main(){
     let matches = cli::build_cli().get_matches();
     let file = matches.get_one::<String>("file").expect("File argument missing");
@@ -44,9 +45,12 @@ fn main(){
     let data_frame = read_parquet_file_polars(file);
     handle_arguments(matches, reader, data_frame);
 
+    //let file_name = "../../waves_wide_missingcols_bp0p1p0.parquet";
     //let file_name = "/Users/00115372/Desktop/mock_catalogs/offical_waves_mocks/waves_deep_gals.parquet";
     //let mut file = std::fs::File::open(file_name).unwrap();
-    //let df = ParquetReader::new(&mut file).finish().unwrap();
+    //let df = read_parquet_file_polars(file_name);
+    //let reader = read_parquet_file(file_name);
+
     //let colnames = df.get_column_names_str();
 
     //let column = df.column("ra").unwrap();

@@ -11,14 +11,16 @@ pub enum PrintFormat {
 
 pub fn print_only_data(reader: &SerializedFileReader<File>) {
     let mut iterator = reader.get_row_iter(None).unwrap();
+    let mut final_vals = Vec::new();
     while let Some(row) = iterator.next() {
         let values: Vec<String> = row
             .unwrap()
             .get_column_iter()
             .map(|(_, value)| format!("{}", value))
             .collect();
-        println!("{}", values.join(" "));
+        final_vals.push(format!("{}", values.join(" ")));
     }
+    println!("{}", final_vals.join("\n"))
 }
 
 pub fn print_metadata(reader: &SerializedFileReader<File>) {
@@ -59,6 +61,34 @@ pub fn print_tail(reader: &SerializedFileReader<File>) {
         println!("{}", values.join(" "));
     }
 }
+
+
+fn print_catlike(data_frame: DataFrame) {
+    // prints the data frame on a row x row basis like cat would.
+    let height = data_frame.height();
+    let columns = data_frame.get_columns();
+
+    for i in 0..height {
+        let row_vals: Vec<String> = columns
+            .iter()
+            .map(|s| format!("{}", s.get(i).unwrap()))
+            .collect();
+        println!("{}", row_vals.join(" "));
+    }
+}
+
+pub fn print_tail_polars(data_frame: DataFrame) {
+    let tail = data_frame.tail(Some(10));
+    print_catlike(tail);
+}
+
+pub fn print_head_polars(data_frame: DataFrame) {
+    let head = data_frame.head(Some(10));
+    let column_names = head.get_column_names_str();
+    println!("{}", column_names.join(" "));
+    print_catlike(head);
+}
+
 
 pub fn print_head(reader: SerializedFileReader<File>) {
     print_column_names(&reader, PrintFormat::Row);
@@ -169,39 +199,4 @@ pub fn print_summary_polars(reader: DataFrame) {
         print_col_summary(column);
     }
 
-}
-
-pub fn print_summary(reader: &SerializedFileReader<File>) {
-    let mut iterator = reader.get_row_iter(None).unwrap();
-    
-    // Get column names
-    let first_row = iterator.next().unwrap().unwrap();
-    let column_names: Vec<String> = first_row.get_column_iter().map(|(name, _)| name.to_string()).collect();
-    
-    // Store column data
-    let mut column_data: Vec<Vec<String>> = vec![vec![]; column_names.len()];
-    let mut row_count = 1;  // First row already read
-
-    for row in iterator {
-        let row = row.unwrap();
-        for (i, (_, value)) in row.get_column_iter().enumerate() {
-            if column_data[i].len() < 5 {  // Limit to 5 samples
-                column_data[i].push(format!("{}", value));
-            }
-        }
-        row_count += 1;
-    }
-
-    // Print row and column count
-    println!("Rows: {}, Columns: {}", row_count, column_names.len());
-
-    // Print each column summary
-    for (name, data) in column_names.iter().zip(column_data.iter()) {
-        let display_data = if data.len() == 5 {
-            format!("[{}, {}, ..., {}, {}]", data[0], data[1], data[3], data[4])
-        } else {
-            format!("[{}]", data.join(", "))
-        };
-        println!("{} {}", name, display_data);
-    }
 }
