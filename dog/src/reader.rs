@@ -2,6 +2,8 @@
 
 use std::{fs::File, process::exit, path::Path};
 use parquet::file::reader::SerializedFileReader;
+use polars::{frame::DataFrame, prelude::ParquetReader};
+use polars::prelude::*;
 
 pub fn read_parquet_file(file_name: &str) -> SerializedFileReader<File> {
     let file = match File::open(Path::new(file_name)) {
@@ -20,3 +22,17 @@ pub fn read_parquet_file(file_name: &str) -> SerializedFileReader<File> {
         }
     }
 }
+
+pub fn read_parquet_file_polars(file_name : &str) -> DataFrame {
+    let mut file =  match File::open(file_name) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("Error opening file: {e}");
+            exit(1)
+        }
+    };
+
+    ParquetReader::new(&mut file).finish().unwrap()
+}
+
+

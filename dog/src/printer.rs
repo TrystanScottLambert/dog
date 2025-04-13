@@ -1,7 +1,8 @@
 // printing module handling all printing functions and routines
 
 use std::{fs::File, process::exit};
-use parquet::file::reader::{FileReader, SerializedFileReader};
+use parquet::{column, file::reader::{FileReader, SerializedFileReader}};
+use polars::{frame::DataFrame, prelude::Column};
 
 pub enum PrintFormat {
     Row,
@@ -38,8 +39,7 @@ pub fn print_column_names(reader: &SerializedFileReader<File>, layout: PrintForm
     match layout {
         PrintFormat::Column => println!("{}", column_names.join("\n")),
         PrintFormat::Row => println!("{}", column_names.join(" ")),
-    };
-    
+    }; 
 }
 
 pub fn print_columns_and_data(reader: SerializedFileReader<File>) {
@@ -125,6 +125,51 @@ pub fn print_selected_columns(reader: &SerializedFileReader<File>, columns: Vec<
     }
 }
  
+
+fn print_col_summary(column: &Column) {
+    if column.len() > 6 {
+        let top_col = column.head(Some(3));
+        let bottom_col = column.tail(Some(3));
+        let mut output = Vec::new();
+    
+        for series in top_col.as_series().into_iter() {
+            for val in series.iter() {
+                output.push(format!("{}", val));
+            }
+        }
+    
+        output.push("...".to_string());
+        for series in bottom_col.as_series().into_iter() {
+            for val in series.iter() {
+                output.push(format!("{}", val));
+            }
+        }
+        println!("{}: [{}]",column.name(), output.join(","))
+       
+    } else {
+        let top_col = column.head(Some(column.len()));
+        let mut output = Vec::new();
+
+        for series in top_col.as_series().into_iter() {
+            for val in series.iter() {
+                output.push(format!("{}", val));
+            }
+        }
+        println!("{}: [{}]",column.name(), output.join(","))
+    }
+}
+
+pub fn print_summary_polars(reader: DataFrame) {
+    let column_data= reader.get_columns();
+    let (number_of_rows, number_of_columns) = reader.shape();
+    
+    print!("Number of Rows: {number_of_rows}\nNumber of columns: {number_of_columns} \n\n");
+    
+    for column in column_data.iter() {
+        print_col_summary(column);
+    }
+
+}
 
 pub fn print_summary(reader: &SerializedFileReader<File>) {
     let mut iterator = reader.get_row_iter(None).unwrap();
