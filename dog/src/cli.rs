@@ -65,4 +65,11 @@ pub fn build_cli() -> Command {
         .help("Prints a summary of the Parquet file.")
         .action(ArgAction::SetTrue)
     )
+    .arg(
+        Arg::new("Peak")
+        .short('p')
+        .long("peak")
+        .help("Peaks at the data. Prints a small table in polars format.")
+        .action(ArgAction::SetTrue)
+    )
 }
