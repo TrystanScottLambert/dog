@@ -2,9 +2,7 @@ mod printer;
 mod reader;
 mod cli;
 
-use std::fmt::Debug;
-use std::process::Output;
-use std::time::Instant;
+
 use crate::printer::*;
 use polars::prelude::*;
 use crate::reader::read_parquet_file;
@@ -53,6 +51,16 @@ fn main(){
     //let df = read_parquet_file_polars(file_name);
     //let reader = read_parquet_file(file_name);
 
+    //let columns = vec!["ra".to_string(), "dec".to_string(), "zobs".to_string()];
+    //let now = Instant::now();
+    //print_selected_columns(&reader, columns);
+    //let arrow_elapsed = now.elapsed();
+    //let columns = vec!["ra".to_string(), "dec".to_string(), "zobs".to_string()];
+    //let now = Instant::now();
+    //print_selected_columns_fast(&reader, columns).unwrap();
+    //let polars_elapsed = now.elapsed();
+    //println!("Arrow {:?}", arrow_elapsed);
+    //println!("Polars {:?}", polars_elapsed);
 
     //let colnames = df.get_column_names_str();
 

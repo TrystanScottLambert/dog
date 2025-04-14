@@ -1,8 +1,7 @@
 // printing module handling all printing functions and routines
 
 use std::{fs::File, process::exit};
-use parquet::{file::reader::{FileReader, SerializedFileReader}};
-use parquet::record::RowAccessor;
+use parquet::file::reader::{FileReader, SerializedFileReader};
 use polars::{frame::DataFrame, prelude::Column};
 use std::io::{self, Write};
 
@@ -120,7 +119,6 @@ pub fn print_selected_columns(reader: &SerializedFileReader<File>, columns: Vec<
         println!("{}", values.join(" "));
     }
 }
- 
 
 fn print_col_summary(column: &Column) {
     if column.len() > 6 {
