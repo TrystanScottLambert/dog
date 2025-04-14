@@ -18,9 +18,9 @@ use parquet::file::reader::SerializedFileReader;
 
 fn handle_arguments(matches: ArgMatches, reader: SerializedFileReader<File>, data_frame: DataFrame) {
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
-        print_column_names(&reader, PrintFormat::Column);
+        print_column_names(data_frame);
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
-        print_only_data(&reader);
+        print_only_data(&reader).unwrap();
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
         print_tail_polars(data_frame);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
@@ -32,8 +32,10 @@ fn handle_arguments(matches: ArgMatches, reader: SerializedFileReader<File>, dat
         print_selected_columns(&reader, columns);
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
         print_summary_polars(data_frame);
+    } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
+        peak(data_frame);
     } else {
-        print_columns_and_data(reader);
+        print_columns_and_data(reader, data_frame);
     }
 }
 
@@ -50,6 +52,7 @@ fn main(){
     //let mut file = std::fs::File::open(file_name).unwrap();
     //let df = read_parquet_file_polars(file_name);
     //let reader = read_parquet_file(file_name);
+
 
     //let colnames = df.get_column_names_str();
 
