@@ -1,65 +1,46 @@
 // printing module handling all printing functions and routines
 
 use std::{fs::File, process::exit};
-use parquet::{column, file::reader::{FileReader, SerializedFileReader}};
+use parquet::{file::reader::{FileReader, SerializedFileReader}};
+use parquet::record::RowAccessor;
 use polars::{frame::DataFrame, prelude::Column};
+use std::io::{self, Write};
 
-pub enum PrintFormat {
-    Row,
-    Column,
-}
 
-pub fn print_only_data(reader: &SerializedFileReader<File>) {
-    let mut iterator = reader.get_row_iter(None).unwrap();
-    let mut final_vals = Vec::new();
-    while let Some(row) = iterator.next() {
-        let values: Vec<String> = row
-            .unwrap()
-            .get_column_iter()
-            .map(|(_, value)| format!("{}", value))
-            .collect();
-        final_vals.push(format!("{}", values.join(" ")));
+pub fn print_only_data(reader: &SerializedFileReader<File>) -> io::Result<()> {
+    let mut row_iter = reader.get_row_iter(None).unwrap();
+    let stdout = io::stdout(); // lock stdout once
+    let mut handle = stdout.lock(); // locking is key for performance
+
+    while let Some(row) = row_iter.next() {
+        let row = row.unwrap();
+        let mut first = true;
+        for (_, value) in row.get_column_iter() {
+            if !first {
+                write!(handle, " ")?; // write space without newline
+            }
+            write!(handle, "{}", value)?;
+            first = false;
+        }
+        writeln!(handle)?; // newline after each row
     }
-    println!("{}", final_vals.join("\n"))
+    Ok(())
 }
+
 
 pub fn print_metadata(reader: &SerializedFileReader<File>) {
     let metadata = reader.metadata();
     println!("{:?}", metadata);
 }
 
-
-pub fn print_column_names(reader: &SerializedFileReader<File>, layout: PrintFormat) {
-    let mut iterator = reader.get_row_iter(None).unwrap();
-    let column_names: Vec<String> = iterator
-        .next()
-        .unwrap()
-        .unwrap()
-        .get_column_iter()
-        .map(|(value, _)| format!("{}", value))
-        .collect();
-    match layout {
-        PrintFormat::Column => println!("{}", column_names.join("\n")),
-        PrintFormat::Row => println!("{}", column_names.join(" ")),
-    }; 
+pub fn print_column_names(data_frame: DataFrame) {
+    let col_names = data_frame.get_column_names_str();
+    println!("{}", col_names.join(" "));
 }
 
-pub fn print_columns_and_data(reader: SerializedFileReader<File>) {
-    print_column_names(&reader, PrintFormat::Row);
-    print_only_data(&reader);
-}
-
-pub fn print_tail(reader: &SerializedFileReader<File>) {
-    let iterator = reader.get_row_iter(None).unwrap();
-    let rows: Vec<_> = iterator.collect::<Result<_, _>>().unwrap();
-
-    for row in rows.iter().rev().take(10).rev() {
-        let values: Vec<String> = row
-            .get_column_iter()
-            .map(|(_, value)| format!("{}", value))
-            .collect();
-        println!("{}", values.join(" "));
-    }
+pub fn print_columns_and_data(reader: SerializedFileReader<File>, data_frame: DataFrame) {
+    print_column_names(data_frame);
+    print_only_data(&reader).unwrap();
 }
 
 
@@ -84,23 +65,8 @@ pub fn print_tail_polars(data_frame: DataFrame) {
 
 pub fn print_head_polars(data_frame: DataFrame) {
     let head = data_frame.head(Some(10));
-    let column_names = head.get_column_names_str();
-    println!("{}", column_names.join(" "));
+    print_column_names(data_frame);
     print_catlike(head);
-}
-
-
-pub fn print_head(reader: SerializedFileReader<File>) {
-    print_column_names(&reader, PrintFormat::Row);
-    let iterator = reader.get_row_iter(None).unwrap();
-    for row in iterator.take(10) {
-        let values: Vec<String> = row
-            .unwrap()
-            .get_column_iter()
-            .map(|(_, value)| format!("{}", value))
-            .collect();
-        println!("{}", values.join(" "))
-    }
 }
 
 pub fn print_selected_columns(reader: &SerializedFileReader<File>, columns: Vec<String>) {
@@ -199,4 +165,9 @@ pub fn print_summary_polars(reader: DataFrame) {
         print_col_summary(column);
     }
 
+}
+
+pub fn peak(data_frame: DataFrame) {
+    // prints out the polars data frame as 'peak'.
+    println!("{:?}", data_frame)
 }
