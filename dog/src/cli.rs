@@ -9,13 +9,13 @@ pub fn build_cli() -> Command {
         Arg::new("file")
             .required(true)
             .index(1) // this will always be the first positional argument
-            .help("Input parquet file"),
+            .help("Input parquet file."),
     )
     .arg(
         Arg::new("names")
             .short('n')
             .long("names")
-            .help("Prints only column names")
+            .help("Prints only column names.")
             .action(ArgAction::SetTrue)
             .conflicts_with("data"),
     )
@@ -23,7 +23,7 @@ pub fn build_cli() -> Command {
         Arg::new("data")
             .short('d')
             .long("data")
-            .help("Prints only the data")
+            .help("Prints only the data.")
             .action(ArgAction::SetTrue)
             .conflicts_with("names"),
     )
@@ -31,7 +31,7 @@ pub fn build_cli() -> Command {
         Arg::new("tail")
         .short('t')
         .long("tail")
-        .help("Prints the bottom ten rows of data")
+        .help("Prints the bottom ten rows of data.")
         .action(ArgAction::SetTrue)
         .conflicts_with("head")
     )
@@ -39,7 +39,7 @@ pub fn build_cli() -> Command {
         Arg::new("head")
         .short('H')
         .long("head")
-        .help("Prints the top ten rows of data")
+        .help("Prints the top ten rows of data and the column names.")
         .action(ArgAction::SetTrue)
         .conflicts_with("tail")
     )
@@ -54,7 +54,7 @@ pub fn build_cli() -> Command {
         Arg::new("columns")
         .short('c')
         .long("columns")
-        .help("Prints only the selected columns by name or index")
+        .help("Prints only the selected columns by name or index.")
         .num_args(1..)
         .value_delimiter(',')
     )
@@ -62,7 +62,14 @@ pub fn build_cli() -> Command {
         Arg::new("summary")
         .short('s')
         .long("summary")
-        .help("Prints a summary of the Parquet file")
+        .help("Prints a summary of the Parquet file.")
+        .action(ArgAction::SetTrue)
+    )
+    .arg(
+        Arg::new("peak")
+        .short('p')
+        .long("peak")
+        .help("Peaks at the data. Prints a small table in polars format.")
         .action(ArgAction::SetTrue)
     )
 }

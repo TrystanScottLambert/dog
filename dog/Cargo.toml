@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
-parquet = "54.3.0"
+polars = {version = "0.46.0", features=["parquet", "csv",  "dtype-i16"]}

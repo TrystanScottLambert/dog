@@ -30,7 +30,7 @@ In the simple case the user need not inlcude any options and just run:
 ```bash
 dog test_file.parquet
 ```
-This will print out the entire data of the parquet file in columnar format including the column names. However sometimes this will be a large list and it might not be possible to see the top of the file.
+This will print out the entire data of the parquet file in columnar format including the column names. If the user doesn't want to include the header then the `-d --data` option is available which only prints the data. This might make piping into another functions like `awk` slightly easier.
 
 ### Head and tail
 Often users will combine `head` and `tail` with `cat` in order to inspect the bottom and top of the file. This is useful when the file is large. For ease of use we include both the `-H --head` and `-t --tail` options which will print the first and last 10 rows of data respectively. 
@@ -38,7 +38,6 @@ Often users will combine `head` and `tail` with `cat` in order to inspect the bo
 dog -H test_file.parquet
 dog -t test_file.parquet
 ```
-Tail will need to read the entire file into memory and should be used sparingly. 
 It is worth noting that the normal `head` and `tail` tools can be used in conjunction with `dog` by piping the output. So while there is no option for selecting the number of rows from the user this functionality can be mimicked. For example
 
 ```bash
@@ -65,16 +64,9 @@ will print out only those columns. The order remains the same so
 ```bash
 dog test_file.parquet -c ra,z_obs,dec,gal_id_new
 ```
-will result in the exact same output. Alternatively we can use the column index. 
+will result in the exact same output.
 
-both 
-```bash
-dog test_file.parquet -c 0,2,4
-dog test_file.parquet -c gal_id_new,ra,z_obs
-```
-are equivalent. **Note that `dog` is 0 indexed meaning the first column is 0.**
-
-the `-c --columns` option must follow **after** the file name. i.e, `dog -c 0 test_file.parquet` will not work.
+The `-c --columns` option must follow **after** the file name. i.e, `dog -c ra test_file.parquet` will not work.
 
 ### Summary
 A summary of the entire contents is availble with the `-s --summary` option. 
@@ -85,8 +77,22 @@ dog -s test_file.parquet
 
 will produce the number of rows and columns of the table and the first and last couple of data points for each column. 
 ```
-Rows: 484551, Columns: 3
+Rows: 484551
+Columns: 3
+
 id_galaxy_sky [68196, 68198, ..., 68202, 68204]
 type [0, 0, ..., 0, 0]
 log_mstar_total [10.768383, 10.1552515, ..., 9.557503, 9.438515]
+```
+
+### Peak
+Another summary view is the `-p --peak` option. This will also give the rows and columns but also include a nicely formated printed out table in polars format.
+```
+dog -p test_file.parquet
+```
+
+### Metadata
+The metadata of the dataframe can also be printed, but in this case this is only the schema which might be incomplete.
+```
+dog -M test_file.parquet
 ```

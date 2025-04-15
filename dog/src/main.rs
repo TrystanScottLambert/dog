@@ -4,36 +4,37 @@ mod cli;
 
 use crate::printer::*;
 use crate::reader::read_parquet_file;
-use std::fs::File;
 use clap::ArgMatches;
-use parquet::file::reader::SerializedFileReader;
 
 
-
-fn handle_arguments(matches: ArgMatches, reader: SerializedFileReader<File>) {
+fn handle_arguments(matches: ArgMatches) {
+    let file = matches.get_one::<String>("file").expect("File argument missing");
+    let data_frame = read_parquet_file(file);
+    
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
-        print_column_names(&reader, PrintFormat::Column);
+        print_column_names(data_frame);
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
-        print_only_data(&reader);
+        print_only_data(data_frame, false);
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-        print_tail(&reader);
+        print_tail(data_frame);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
-        print_head(reader);
+        print_head(data_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
-        print_metadata(&reader);
+        print_metadata(file);
     } else if let Some(columns) = matches.get_many::<String>("columns") {
         let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
-        print_selected_columns(&reader, columns);
+        print_selected_columns(data_frame, columns);
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
-        print_summary(&reader);
+        print_summary(data_frame);
+    } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
+        peak(data_frame);
     } else {
-        print_columns_and_data(reader);
+        print_only_data(data_frame, true);
     }
 }
 
+
 fn main(){
     let matches = cli::build_cli().get_matches();
-    let file = matches.get_one::<String>("file").expect("File argument missing");
-    let reader = read_parquet_file(file);
-    handle_arguments(matches, reader);
+    handle_arguments(matches);
 }
