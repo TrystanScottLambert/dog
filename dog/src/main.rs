@@ -51,6 +51,7 @@ fn main(){
     //let df = read_parquet_file_polars(file_name);
     //let reader = read_parquet_file(file_name);
 
+    //peak(df)
     //let columns = vec!["ra".to_string(), "dec".to_string(), "zobs".to_string()];
     //let now = Instant::now();
     //print_selected_columns(&reader, columns);

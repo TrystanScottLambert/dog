@@ -66,7 +66,7 @@ pub fn build_cli() -> Command {
         .action(ArgAction::SetTrue)
     )
     .arg(
-        Arg::new("Peak")
+        Arg::new("peak")
         .short('p')
         .long("peak")
         .help("Peaks at the data. Prints a small table in polars format.")
