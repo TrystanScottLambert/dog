@@ -1,9 +1,9 @@
 dog. It's like cat, but for parquet.
 
 # Motivation
-`dog` is meant to be a clean way of quickly inspecting parquet files in the same way that one might done using `cat`. `cat` is the concatenates text files and prints them to standard output and so it's quite commonly used in terminal environments to check the contents of files such as .csv or .txt.
+`dog` is meant to be a clean way of quickly inspecting parquet files in the same way that might done using `cat`. `cat` concatenates text files and prints them to standard output; It's quite commonly used in terminal environments to check the contents of files such as .csv or .txt.
 
-However, `cat` is not useful for some file formats which do are not simple text files (e.g. .fits or .parquet). 
+However, `cat` is not useful for some file formats which are not simple text files (e.g. .fits or .parquet). 
 
 `dog` aims to be an alternative to cat for these kinds of files. 
 
@@ -18,6 +18,9 @@ sudo mv dog /usr/local/bin/
 ```
 
 You may need to start a new terminal to get it working.
+
+If you don't want to install the binary then you can compile the program from source using 'cargo'. 
+
 # Usage
 
 The help file for `dog` is available as `dog -h` or `dog --help` but we explain some common usages below. The options for dog can be supplied either before the file name (if there are no parameters that need to be passed) or after the file name.
@@ -25,12 +28,12 @@ The help file for `dog` is available as `dog -h` or `dog --help` but we explain 
 We use a file name `test_file.parquet` in these examples. 
 
 ### Simple case
-In the simple case the user need not inlcude any options and just run:
+In the simple case the user need not include any options and just run:
 
 ```bash
 dog test_file.parquet
 ```
-This will print out the entire data of the parquet file in columnar format including the column names. If the user doesn't want to include the header then the `-d --data` option is available which only prints the data. This might make piping into another functions like `awk` slightly easier.
+This will print out the entire data of the parquet file in a columnar format, including the column names. If the user doesn't want to include the header then the `-d --data` option is available which only prints the data. This might make piping into other functions (like `awk`) slightly easier.
 
 ### Head and tail
 Often users will combine `head` and `tail` with `cat` in order to inspect the bottom and top of the file. This is useful when the file is large. For ease of use we include both the `-H --head` and `-t --tail` options which will print the first and last 10 rows of data respectively. 
@@ -43,12 +46,12 @@ It is worth noting that the normal `head` and `tail` tools can be used in conjun
 ```bash
 dog test_file.parquet | head -n 20
 ```
-will print the first 20 rows of the output from `dog` (19 rows of data plus the header)
+will print the first 20 rows of the output from `dog` (19 rows of data plus the header).
 
 
 
 ### Column names
-Often times it is useful to get the full names of columns in a file. This can be done with `-n --names`
+Often times it is useful to get the full names of the columns in a file. This can be done with `-n --names`
 ```bash
 dog -n test_file.parquet
 ```
@@ -90,9 +93,10 @@ Another summary view is the `-p --peak` option. This will also give the rows and
 ```
 dog -p test_file.parquet
 ```
+However, more often than not, columns and rows will be emitted except for a couple at the corners.
 
 ### Metadata
-The metadata of the dataframe can also be printed, but in this case this is only the schema which might be incomplete.
+The metadata of the dataframe can also be printed, but in this case this is only the schema which might be incomplete. Future releases will have better meta data handling.
 ```
 dog -M test_file.parquet
 ```
