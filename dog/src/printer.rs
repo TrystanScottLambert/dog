@@ -5,7 +5,7 @@ use polars::{frame::DataFrame, prelude::{Column, CsvWriter}};
 use polars::prelude::*;
 
 
-pub fn print_only_data_polars(data_frame: DataFrame, include_header: bool) {
+pub fn print_only_data(data_frame: DataFrame, include_header: bool) {
     let mut out = std::io::stdout().lock();
     let mut df = data_frame.clone();  // Make a mutable copy just for writing
     
@@ -49,20 +49,20 @@ fn print_catlike(data_frame: DataFrame) {
     }
 }
 
-pub fn print_tail_polars(data_frame: DataFrame) {
+pub fn print_tail(data_frame: DataFrame) {
     let tail = data_frame.tail(Some(10));
     print_catlike(tail);
 }
 
-pub fn print_head_polars(data_frame: DataFrame) {
+pub fn print_head(data_frame: DataFrame) {
     let head = data_frame.head(Some(10));
     print_column_names(data_frame);
     print_catlike(head);
 }
 
-pub fn print_selected_columns_polars(data_frame: DataFrame, columns: Vec<String>) {
+pub fn print_selected_columns(data_frame: DataFrame, columns: Vec<String>) {
     let reduced_data_frame = data_frame.select(columns);
-    print_only_data_polars(reduced_data_frame.unwrap(), true);
+    print_only_data(reduced_data_frame.unwrap(), true);
 }
 
 fn print_col_summary(column: &Column) {
@@ -98,7 +98,7 @@ fn print_col_summary(column: &Column) {
     }
 }
 
-pub fn print_summary_polars(reader: DataFrame) {
+pub fn print_summary(reader: DataFrame) {
     let column_data= reader.get_columns();
     let (number_of_rows, number_of_columns) = reader.shape();
     

@@ -5,7 +5,7 @@ use polars::{frame::DataFrame, prelude::ParquetReader};
 use polars::prelude::*;
 
 
-pub fn read_parquet_file_polars(file_name : &str) -> DataFrame {
+pub fn read_parquet_file(file_name : &str) -> DataFrame {
     let mut file =  match File::open(file_name) {
         Ok(file) => file,
         Err(e) => {
