@@ -1,45 +1,37 @@
 // printing module handling all printing functions and routines
 
-use std::{fs::File, process::exit};
-use parquet::file::reader::{FileReader, SerializedFileReader};
-use polars::{frame::DataFrame, prelude::Column};
-use std::io::{self, Write};
+use std::fs::File;
+use polars::{frame::DataFrame, prelude::{Column, CsvWriter}};
+use polars::prelude::*;
 
 
-pub fn print_only_data(reader: &SerializedFileReader<File>) -> io::Result<()> {
-    let mut row_iter = reader.get_row_iter(None).unwrap();
-    let stdout = io::stdout(); // lock stdout once
-    let mut handle = stdout.lock(); // locking is key for performance
-
-    while let Some(row) = row_iter.next() {
-        let row = row.unwrap();
-        let mut first = true;
-        for (_, value) in row.get_column_iter() {
-            if !first {
-                write!(handle, " ")?; // write space without newline
-            }
-            write!(handle, "{}", value)?;
-            first = false;
-        }
-        writeln!(handle)?; // newline after each row
+pub fn print_only_data_polars(data_frame: DataFrame, include_header: bool) {
+    let mut out = std::io::stdout().lock();
+    let mut df = data_frame.clone();  // Make a mutable copy just for writing
+    
+    if include_header == true {
+        CsvWriter::new(&mut out)
+        .include_header(true)
+        .with_separator(b' ')
+        .finish(&mut df)
+        .expect("Failed to write full CSV to stdout");
+    } else {
+        CsvWriter::new(&mut out)
+        .with_separator(b' ')
+        .finish(&mut df)
+        .expect("Failed to write full CSV to stdout");
     }
-    Ok(())
 }
 
-
-pub fn print_metadata(reader: &SerializedFileReader<File>) {
-    let metadata = reader.metadata();
-    println!("{:?}", metadata);
+pub fn print_metadata(file_name: &str) {
+    let file = File::open(file_name).unwrap();
+    let schema = ParquetReader::new(file).schema().unwrap();
+    println!("{:#?}", schema);
 }
 
 pub fn print_column_names(data_frame: DataFrame) {
     let col_names = data_frame.get_column_names_str();
     println!("{}", col_names.join(" "));
-}
-
-pub fn print_columns_and_data(reader: SerializedFileReader<File>, data_frame: DataFrame) {
-    print_column_names(data_frame);
-    print_only_data(&reader).unwrap();
 }
 
 
@@ -68,56 +60,9 @@ pub fn print_head_polars(data_frame: DataFrame) {
     print_catlike(head);
 }
 
-pub fn print_selected_columns(reader: &SerializedFileReader<File>, columns: Vec<String>) {
-    let mut iterator = reader.get_row_iter(None).unwrap();
-
-    // Get column names from the first row
-    let first_row = iterator.next().unwrap().unwrap();
-    let column_names: Vec<String> = first_row
-        .get_column_iter()
-        .map(|(name, _)| name.to_string())
-        .collect();
-
-    // Determine which columns to extract (indices)
-    let selected_indices: Vec<usize> = columns
-        .iter()
-        .filter_map(|col| {
-            if let Ok(idx) = col.parse::<usize>() {
-                if idx < column_names.len() {
-                    Some(idx) // Column index case
-                } else {
-                    None // Ignore invalid indices
-                }
-            } else {
-                column_names.iter().position(|name| name == col) // Column name case
-            }
-        })
-        .collect();
-
-    if selected_indices.is_empty() {
-        eprintln!("No valid columns selected!");
-        exit(1);
-    }
-
-    // Print selected column headers
-    println!("{}", selected_indices.iter().map(|&i| column_names[i].clone()).collect::<Vec<String>>().join(" "));
-
-    // Print selected column data for each row
-    for row in reader.get_row_iter(None).unwrap() {
-        let row = row.unwrap();
-        let values: Vec<String> = row
-            .get_column_iter()
-            .enumerate()
-            .filter_map(|(idx, (_, value))| {
-                if selected_indices.contains(&idx) {
-                    Some(format!("{}", value))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        println!("{}", values.join(" "));
-    }
+pub fn print_selected_columns_polars(data_frame: DataFrame, columns: Vec<String>) {
+    let reduced_data_frame = data_frame.select(columns);
+    print_only_data_polars(reduced_data_frame.unwrap(), true);
 }
 
 fn print_col_summary(column: &Column) {
