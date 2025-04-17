@@ -9,8 +9,14 @@ use clap::ArgMatches;
 
 fn handle_arguments(matches: ArgMatches) {
     let file = matches.get_one::<String>("file").expect("File argument missing");
-    let data_frame = read_parquet_file(file);
+    let mut data_frame = read_parquet_file(file);
     
+    // Optional column filtering BEFORE any printing
+    if let Some(columns) = matches.get_many::<String>("columns") {
+        let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
+        data_frame = data_frame.select(columns).unwrap();
+    }
+
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
         print_column_names(data_frame);
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
@@ -21,9 +27,6 @@ fn handle_arguments(matches: ArgMatches) {
         print_head(data_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_metadata(file);
-    } else if let Some(columns) = matches.get_many::<String>("columns") {
-        let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
-        print_selected_columns(data_frame, columns);
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
         print_summary(data_frame);
     } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {

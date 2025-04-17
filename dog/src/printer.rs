@@ -31,9 +31,8 @@ pub fn print_metadata(file_name: &str) {
 
 pub fn print_column_names(data_frame: DataFrame) {
     let col_names = data_frame.get_column_names_str();
-    println!("{}", col_names.join(" "));
+    println!("{}", col_names.join("\n"));
 }
-
 
 fn print_catlike(data_frame: DataFrame) {
     // prints the data frame on a row x row basis like cat would.
@@ -58,11 +57,6 @@ pub fn print_head(data_frame: DataFrame) {
     let head = data_frame.head(Some(10));
     print_column_names(data_frame);
     print_catlike(head);
-}
-
-pub fn print_selected_columns(data_frame: DataFrame, columns: Vec<String>) {
-    let reduced_data_frame = data_frame.select(columns);
-    print_only_data(reduced_data_frame.unwrap(), true);
 }
 
 fn print_col_summary(column: &Column) {
