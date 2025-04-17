@@ -54,7 +54,7 @@ pub fn build_cli() -> Command {
         Arg::new("columns")
         .short('c')
         .long("columns")
-        .help("Prints only the selected columns by name or index.")
+        .help("Prints only the selected columns by name.")
         .num_args(1)
         .value_delimiter(',')
     )
