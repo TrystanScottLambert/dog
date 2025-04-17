@@ -60,16 +60,21 @@ dog -n test_file.parquet
 It's possible to only select certain columns. For example, we might have columns such as `gal_id_new`, `gal_id_old`, `ra`, `dec`, `z_obs`, `z_cos`, in that order. In some cases we may only be interested in one of these columns, or a subset. 
 
 ```bash
-dog test_file.parquet -c gal_id_new,ra,dec,z_obs
+dog  -c gal_id_new,ra,dec,z_obs test_file.parquet
 ```
 
 will print out only those columns. The order remains the same so
 ```bash
-dog test_file.parquet -c ra,z_obs,dec,gal_id_new
+dog  -c ra,z_obs,dec,gal_id_new test_file.parquet
 ```
 will result in the exact same output.
 
-The `-c --columns` option must follow **after** the file name. i.e, `dog -c ra test_file.parquet` will not work.
+the `-c --columns` option can be used *in combination* with all the other options. If we only want the tail of the ra and dec columns of the parquet file this can be done 
+```
+dog -c ra,dec -t test_file.parquet
+```
+
+This is more useful when combined with the "summary" and "peak" options.
 
 ### Summary
 A summary of the entire contents is availble with the `-s --summary` option. 
