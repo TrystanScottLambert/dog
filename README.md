@@ -12,7 +12,7 @@ Currently `dog` is only available on mac-os but will be made availble on linux s
 
 **Installing dog is very easy**
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.2.0/dog-macos-x86_64
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.2.1/dog-macos-x86_64
 chmod +x dog
 sudo mv dog /usr/local/bin/
 ```
