@@ -24,8 +24,10 @@ pub fn print_only_data(data_frame: DataFrame, include_header: bool) {
 }
 
 pub fn print_metadata(file_name: &str) {
-    let file = File::open(file_name).unwrap();
-    let schema = ParquetReader::new(file).schema().unwrap();
+    let file = File::open(file_name).expect("Problem reading file file.");
+    let schema = ParquetReader::new(file)
+        .schema()
+        .expect("Problem reading header.");
     println!("{:#?}", schema);
 }
 

@@ -14,7 +14,7 @@ fn handle_arguments(matches: ArgMatches) {
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
         let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
-        data_frame = data_frame.select(columns).unwrap();
+        data_frame = data_frame.select(columns).expect("Column naming mismatch.");
     }
 
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
