@@ -8,7 +8,9 @@ However, `cat` is not useful for some file formats which are not simple text fil
 `dog` aims to be an alternative to cat for these kinds of files. 
 
 # Installation	
-Currently `dog` is only available on mac-os but will be made availble on linux soon. 
+
+## Downloading the binary
+The binary for `dog` is only available on mac-os but will be made availble on linux soon. 
 
 **Installing dog is very easy**
 ```
@@ -20,6 +22,35 @@ sudo mv dog /usr/local/bin/
 You may need to start a new terminal to get it working.
 
 If you don't want to install the binary then you can compile the program from source using 'cargo'. 
+
+## Compile from source
+
+If you are using linux or don't want to download a binary file then `dog` can be built from scource using cargo. 
+
+First make sure you have rust installed:
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Download the dog repo with git
+```
+git clone git@github.com:TrystanScottLambert/dog.git
+```
+
+cd into the dog folder
+`cd dog/dog/`
+You should be able to see the `Cargo.toml` file. From here compile using cargo (which would already be installed with rust.)
+```
+cargo build --release
+```
+
+Then simply move the binary file into your /bin directory
+
+```
+sudo mv /target/release/bin/dog /usr/local/bin
+```
+
+You may need to restart the terminal. 
 
 # Usage
 
