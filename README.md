@@ -1,7 +1,11 @@
 dog. It's like cat, but for parquet.
 
 # Motivation
-`dog` is meant to be a clean way of quickly inspecting parquet files in the same way that might done using `cat`. `cat` concatenates text files and prints them to standard output; It's quite commonly used in terminal environments to check the contents of files such as .csv or .txt.
+Parquet is a relatively new, open source, file format from Apache which is becoming very popular and is already being adopted extensively within data intensive fields. It is a column-orientated format of storing data and benefits from a large amount of compression ([more information is available at the official apache parquet site](https://parquet.apache.org/)). 
+
+Although parquet is quickly being adopted, exploring these files often requires a opening another program (e.g. topcat) or programming language (`R` or `python`) to even take a quick look. Writing three or four lines of code just to see what is in a file is just too many.
+
+`dog` is meant to be a clean way of quickly inspecting .parquet files in the terminal, in same way that might done using `cat`. `cat` concatenates text files and prints them to standard output; It's quite commonly used in terminal environments to check the contents of files such as .csv or .txt.
 
 However, `cat` is not useful for some file formats which are not simple text files (e.g. .fits or .parquet). 
 
