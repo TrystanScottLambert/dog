@@ -42,7 +42,7 @@ git clone git@github.com:TrystanScottLambert/dog.git
 ```
 
 cd into the dog folder
-`cd dog/dog/`
+`cd dog/`
 You should be able to see the `Cargo.toml` file. From here compile using cargo (which would already be installed with rust.)
 ```
 cargo build --release
