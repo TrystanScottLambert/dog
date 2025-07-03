@@ -51,7 +51,7 @@ cargo build --release
 Then simply move the binary file into your /bin directory
 
 ```
-sudo mv /target/release/bin/dog /usr/local/bin
+sudo mv target/release/dog /usr/local/bin
 ```
 
 You may need to restart the terminal. 
