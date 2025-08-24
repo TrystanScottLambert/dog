@@ -47,7 +47,7 @@ pub fn build_cli() -> Command {
         Arg::new("META")
         .short('M')
         .long("META")
-        .help("Forcefully prints all metadata without any formatting.")
+        .help("Forcefully prints metadata schema without any formatting.")
         .action(ArgAction::SetTrue)
     )
     .arg(
