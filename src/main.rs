@@ -1,16 +1,17 @@
+mod cli;
 mod printer;
 mod reader;
-mod cli;
 
 use crate::printer::*;
 use crate::reader::read_parquet_file;
 use clap::ArgMatches;
 
-
 fn handle_arguments(matches: ArgMatches) {
-    let file = matches.get_one::<String>("file").expect("File argument missing");
+    let file = matches
+        .get_one::<String>("file")
+        .expect("File argument missing");
     let mut data_frame = read_parquet_file(file);
-    
+
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
         let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
@@ -27,6 +28,8 @@ fn handle_arguments(matches: ArgMatches) {
         print_head(data_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_metadata(file);
+    } else if *matches.get_one::<bool>("waves_metadata").unwrap_or(&false) {
+        print_waves_metadata(file);
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
         print_summary(data_frame);
     } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
@@ -36,8 +39,7 @@ fn handle_arguments(matches: ArgMatches) {
     }
 }
 
-
-fn main(){
+fn main() {
     let matches = cli::build_cli().get_matches();
     handle_arguments(matches);
 }
