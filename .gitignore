@@ -4,3 +4,10 @@ target/*
 ./dog/target
 *.o
 ./dog/target/debug/deps/*
+.vscode/
+.idea/
+.DS_Store
+.vscode/*
+.vscode/*
+.idea/
+.DS_Store
