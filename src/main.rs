@@ -28,7 +28,7 @@ fn handle_arguments(matches: ArgMatches) {
         print_head(data_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_metadata(file);
-    } else if *matches.get_one::<bool>("waves_metadata").unwrap_or(&false) {
+    } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {
         print_waves_metadata(file);
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
         print_summary(data_frame);

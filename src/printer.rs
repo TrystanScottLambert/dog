@@ -39,17 +39,16 @@ pub fn print_waves_metadata(file_name: &str) {
     match reader.get_metadata() {
         Ok(file_metadata) => {
             if let Some(kv_metadata) = file_metadata.key_value_metadata() {
-                // Look for waves_metadata
+                // Look for keyword maml
                 for kv in kv_metadata {
-                    if kv.key == "waves_metadata" {
+                    if kv.key == "maml" {
                         if let Some(value) = &kv.value {
-                            println!("=== WAVES Metadata ===");
                             println!("{}", value);
                             return;
                         }
                     }
                 }
-                println!("No WAVES metadata found in file.");
+                println!("No MAML metadata found in file.");
             } else {
                 println!("No metadata found in file.");
             }

@@ -73,10 +73,10 @@ pub fn build_cli() -> Command {
                 .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::new("waves_metadata")
+            Arg::new("maml")
                 .short('w')
-                .long("waves_metadata")
-                .help("Prints the WAVES metadata if it exists.")
+                .long("maml")
+                .help("Print the MAML metadata if it exists.")
                 .action(ArgAction::SetTrue),
         )
 }
