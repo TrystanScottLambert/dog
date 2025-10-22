@@ -72,4 +72,11 @@ pub fn build_cli() -> Command {
                 .help("Peaks at the data. Prints a small table in polars format.")
                 .action(ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("waves_metadata")
+                .short('w')
+                .long("waves_metadata")
+                .help("Prints the WAVES metadata if it exists.")
+                .action(ArgAction::SetTrue),
+        )
 }

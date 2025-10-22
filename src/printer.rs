@@ -9,7 +9,7 @@ pub fn print_only_data(data_frame: DataFrame, include_header: bool) {
     let mut out = std::io::stdout().lock();
     let mut df = data_frame.clone();  // Make a mutable copy just for writing
     
-    if include_header == true {
+    if include_header {
         CsvWriter::new(&mut out)
         .include_header(true)
         .with_separator(b' ')
@@ -29,6 +29,33 @@ pub fn print_metadata(file_name: &str) {
         .schema()
         .expect("Problem reading header.");
     println!("{:#?}", schema);
+}
+
+pub fn print_waves_metadata(file_name: &str) {
+    let file = File::open(file_name).expect("Problem reading file.");
+    let mut reader = ParquetReader::new(file);
+    
+    // Get the file metadata
+    match reader.get_metadata() {
+        Ok(file_metadata) => {
+            if let Some(kv_metadata) = file_metadata.key_value_metadata() {
+                // Look for waves_metadata
+                for kv in kv_metadata {
+                    if kv.key == "waves_metadata" {
+                        if let Some(value) = &kv.value {
+                            println!("=== WAVES Metadata ===");
+                            println!("{}", value);
+                            return;
+                        }
+                    }
+                }
+                println!("No WAVES metadata found in file.");
+            } else {
+                println!("No metadata found in file.");
+            }
+        }
+        Err(e) => println!("Error reading metadata: {}", e),
+    }
 }
 
 pub fn print_column_names(data_frame: DataFrame) {

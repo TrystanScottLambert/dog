@@ -1,20 +1,20 @@
-dog. It's like cat, but for parquet.
+`dog`. It's like cat, but for parquet.
 
 # Motivation
 Parquet is a relatively new, open source, file format from Apache which is becoming very popular and is already being adopted extensively within data intensive fields. It is a column-orientated format of storing data and benefits from a large amount of compression ([more information is available at the official apache parquet site](https://parquet.apache.org/)). 
 
-Although parquet is quickly being adopted, exploring these files often requires a opening another program (e.g. topcat) or programming language (`R` or `python`) to even take a quick look. Writing three or four lines of code just to see what is in a file is just too many.
+Although parquet is quickly being adopted, exploring these files often requires opening another program (e.g. topcat) or programming language (`R` or `python`) to even take a quick look. Writing three or four lines of code just to see what is in a file is just too many.
 
-`dog` is meant to be a clean way of quickly inspecting .parquet files in the terminal, in same way that might done using `cat`. `cat` concatenates text files and prints them to standard output; It's quite commonly used in terminal environments to check the contents of files such as .csv or .txt.
+`dog` is meant to be a clean way of quickly inspecting .parquet files in the terminal, in the same way that might done using `cat`. `cat` concatenates text files and prints them to standard output; it's quite commonly used in terminal environments to check the contents of files such as .csv or .txt.
 
 However, `cat` is not useful for some file formats which are not simple text files (e.g. .fits or .parquet). 
 
-`dog` aims to be an alternative to cat for these kinds of files. 
+`dog` aims to be an alternative to `cat` for these kinds of files. 
 
 # Installation	
 
 ## Downloading the binary
-The binary for `dog` is only available on mac-os but will be made availble on linux soon. 
+The binary for `dog` is only available on mac-os but will be made available on Linux soon. 
 
 **Installing dog is very easy**
 ```
@@ -29,7 +29,7 @@ If you don't want to install the binary then you can compile the program from so
 
 ## Compile from source
 
-If you are using linux or don't want to download a binary file then `dog` can be built from scource using cargo. 
+If you are using Linux or don't want to download a binary file then `dog` can be built from source using cargo. 
 
 First make sure you have rust installed:
 ```
@@ -86,7 +86,7 @@ will print the first 20 rows of the output from `dog` (19 rows of data plus the 
 
 
 ### Column names
-Often times it is useful to get the full names of the columns in a file. This can be done with `-n --names`
+Often, it is useful to get the full names of the columns in a file. This can be done with `-n --names`
 ```bash
 dog -n test_file.parquet
 ```
