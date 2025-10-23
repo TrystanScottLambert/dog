@@ -1,25 +1,27 @@
 // printing module handling all printing functions and routines
 
-use std::fs::File;
-use polars::{frame::DataFrame, prelude::{Column, CsvWriter}};
 use polars::prelude::*;
-
+use polars::{
+    frame::DataFrame,
+    prelude::{Column, CsvWriter},
+};
+use std::fs::File;
 
 pub fn print_only_data(data_frame: DataFrame, include_header: bool) {
     let mut out = std::io::stdout().lock();
-    let mut df = data_frame.clone();  // Make a mutable copy just for writing
-    
+    let mut df = data_frame.clone(); // Make a mutable copy just for writing
+
     if include_header {
         CsvWriter::new(&mut out)
-        .include_header(true)
-        .with_separator(b' ')
-        .finish(&mut df)
-        .expect("Failed to write full CSV to stdout");
+            .include_header(true)
+            .with_separator(b' ')
+            .finish(&mut df)
+            .expect("Failed to write full CSV to stdout");
     } else {
         CsvWriter::new(&mut out)
-        .with_separator(b' ')
-        .finish(&mut df)
-        .expect("Failed to write full CSV to stdout");
+            .with_separator(b' ')
+            .finish(&mut df)
+            .expect("Failed to write full CSV to stdout");
     }
 }
 
@@ -34,7 +36,7 @@ pub fn print_metadata(file_name: &str) {
 pub fn print_waves_metadata(file_name: &str) {
     let file = File::open(file_name).expect("Problem reading file.");
     let mut reader = ParquetReader::new(file);
-    
+
     // Get the file metadata
     match reader.get_metadata() {
         Ok(file_metadata) => {
@@ -92,21 +94,20 @@ fn print_col_summary(column: &Column) {
         let top_col = column.head(Some(3));
         let bottom_col = column.tail(Some(3));
         let mut output = Vec::new();
-    
+
         for series in top_col.as_series().into_iter() {
             for val in series.iter() {
                 output.push(format!("{}", val));
             }
         }
-    
+
         output.push("...".to_string());
         for series in bottom_col.as_series().into_iter() {
             for val in series.iter() {
                 output.push(format!("{}", val));
             }
         }
-        println!("{}: [{}]",column.name(), output.join(","))
-       
+        println!("{}: [{}]", column.name(), output.join(","))
     } else {
         let top_col = column.head(Some(column.len()));
         let mut output = Vec::new();
@@ -116,20 +117,19 @@ fn print_col_summary(column: &Column) {
                 output.push(format!("{}", val));
             }
         }
-        println!("{}: [{}]",column.name(), output.join(","))
+        println!("{}: [{}]", column.name(), output.join(","))
     }
 }
 
 pub fn print_summary(reader: DataFrame) {
-    let column_data= reader.get_columns();
+    let column_data = reader.get_columns();
     let (number_of_rows, number_of_columns) = reader.shape();
-    
+
     print!("Number of Rows: {number_of_rows}\nNumber of columns: {number_of_columns} \n\n");
-    
+
     for column in column_data.iter() {
         print_col_summary(column);
     }
-
 }
 
 pub fn peak(data_frame: DataFrame) {
