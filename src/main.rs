@@ -1,16 +1,17 @@
 mod cli;
 mod printer;
 mod reader;
+mod fits;
 
 use crate::printer::*;
-use crate::reader::read_parquet_file;
+use crate::reader::read_file;
 use clap::ArgMatches;
 
 fn handle_arguments(matches: ArgMatches) {
     let file = matches
         .get_one::<String>("file")
         .expect("File argument missing");
-    let mut data_frame = read_parquet_file(file);
+    let mut data_frame = read_file(file);
 
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
