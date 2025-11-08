@@ -79,4 +79,10 @@ pub fn build_cli() -> Command {
                 .help("Print the MAML metadata if it exists.")
                 .action(ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("convert")
+            .long("convert")
+            .help("Attempts to convert csv and fits file into a parquet if it can.")
+            .action(ArgAction::SetTrue)
+        )
 }
