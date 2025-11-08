@@ -1,16 +1,18 @@
 mod cli;
 mod printer;
 mod reader;
+mod write;
 
 use crate::printer::*;
-use crate::reader::read_parquet_file;
+use crate::reader::{read_file, which_file, FileType};
+use crate::write::write_parquet;
 use clap::ArgMatches;
 
 fn handle_arguments(matches: ArgMatches) {
     let file = matches
         .get_one::<String>("file")
         .expect("File argument missing");
-    let mut data_frame = read_parquet_file(file);
+    let mut data_frame = read_file(file);
 
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
@@ -34,6 +36,13 @@ fn handle_arguments(matches: ArgMatches) {
         print_summary(data_frame);
     } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
         peak(data_frame);
+    } else if *matches.get_one::<bool>("convert").unwrap_or(&false) {
+        let outfile = match which_file(file) {
+            FileType::Csv => file.replace(".csv", "_converted.parquet"),
+            FileType::Fits => file.replace(".fits", "_converted.parquet"),
+            FileType::Parquet => panic!("File is already a parquet!"),
+        };
+        write_parquet(&mut data_frame, &outfile).unwrap();
     } else {
         print_only_data(data_frame, true);
     }
