@@ -18,7 +18,7 @@ The binary for `dog` is only available on mac-os but will be made available on L
 
 **Installing dog is very easy**
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.2.1/dog-macos-x86_64
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3.0/dog
 chmod +x dog
 sudo mv dog /usr/local/bin/
 ```
@@ -140,3 +140,31 @@ The metadata of the dataframe can also be printed, but in this case this is only
 ```
 dog -M test_file.parquet
 ```
+
+### MAML metadata
+`dog` has specific support for "Meta YAML" or "MAML" (see: https://github.com/asgr/MAML). This is a structured metadata for astronomical surveys like WAVES and 4HS. If this metadata exists then it can be viewed using the -w and --maml flags.
+
+```bash
+dog -w test_file.parquet
+dog --maml test_file.parquet
+```
+This is a useful way to strip MAML metadata from a parquet file
+```bash
+dog -w test_file.parquet > test.maml
+```
+
+### Reading non-parquet and converting files
+`dog` is built with parquet in mind, however, it can also read fits tables and csv tables in the exact same way as above. 
+```bash
+dog test.fits
+dog test.csv
+dog -p another_test.fits
+dog -t another_test.csv
+```
+
+In addition to reading these other files which are quite common, these files can also be converted easily to parquet using the --convert flag.
+
+```bash
+dog --convert test.fits
+```
+will convert the .fits table to parquet and create a file called `test_converted.parquet`.
