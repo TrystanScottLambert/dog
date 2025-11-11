@@ -18,7 +18,7 @@ The binary for `dog` is only available on mac-os but will be made available on L
 
 **Installing dog is very easy**
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3.0/dog
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3.1/dog
 chmod +x dog
 sudo mv dog /usr/local/bin/
 ```
