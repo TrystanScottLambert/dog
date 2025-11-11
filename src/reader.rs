@@ -34,11 +34,12 @@ pub fn read_csv_file(path: &str) -> DataFrame {
     CsvReader::new(&mut file).finish().expect("Failed parsing.")
 }
 
+
 pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error>> {
     let mut fptr = FitsFile::open(path)?;
     let hdu = fptr.hdu(1)?;
     let num_cols: i64 = hdu.read_key(&mut fptr, "TFIELDS")?;
-
+    
     // Collect column metadata first
     let mut col_info = Vec::new();
     for i in 1..=num_cols {
@@ -46,57 +47,148 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
         let col_type: String = hdu.read_key(&mut fptr, &format!("TFORM{}", i))?;
         col_info.push((i, col_name, col_type));
     }
-
+    
     // Read columns in parallel
-    let results: Vec<Result<Column, Box<dyn std::error::Error + Send + Sync>>> = col_info
+    let results: Vec<Result<Vec<Column>, Box<dyn std::error::Error + Send + Sync>>> = col_info
         .par_iter()
         .map(
-            |(_, col_name, col_type)| -> Result<Column, Box<dyn std::error::Error + Send + Sync>> {
+            |(_, col_name, col_type)| -> Result<Vec<Column>, Box<dyn std::error::Error + Send + Sync>> {
                 // Each thread needs its own file handle
                 let mut local_fptr = FitsFile::open(path)?;
                 let local_hdu = local_fptr.hdu(1)?;
-
-                let series = match col_type.chars().last() {
-                    Some('E') => {
-                        let data: Vec<f32> = local_hdu.read_col(&mut local_fptr, col_name)?;
-                        Series::new(col_name.into(), data)
+                
+                // Parse the column type to check for vector columns
+                let (repeat_count, type_char) = parse_tform(col_type)?;
+                
+                let columns = if repeat_count > 1 {
+                    // Vector column - read flat data and reshape
+                    match type_char {
+                        'E' => {
+                            let flat_data: Vec<f32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            expand_vector_column_from_flat::<Float32Type>(col_name, flat_data, repeat_count)?
+                        }
+                        'D' => {
+                            let flat_data: Vec<f64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            expand_vector_column_from_flat::<Float64Type>(col_name, flat_data, repeat_count)?
+                        }
+                        'J' => {
+                            let flat_data: Vec<i32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            expand_vector_column_from_flat::<Int32Type>(col_name, flat_data, repeat_count)?
+                        }
+                        'K' => {
+                            let flat_data: Vec<i64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            expand_vector_column_from_flat::<Int64Type>(col_name, flat_data, repeat_count)?
+                        }
+                        _ => {
+                            return Err(Box::new(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                format!("Unsupported vector column type: {}", col_type),
+                            )));
+                        }
                     }
-                    Some('D') => {
-                        let data: Vec<f64> = local_hdu.read_col(&mut local_fptr, col_name)?;
-                        Series::new(col_name.into(), data)
-                    }
-                    Some('J') => {
-                        let data: Vec<i32> = local_hdu.read_col(&mut local_fptr, col_name)?;
-                        Series::new(col_name.into(), data)
-                    }
-                    Some('K') => {
-                        let data: Vec<i64> = local_hdu.read_col(&mut local_fptr, col_name)?;
-                        Series::new(col_name.into(), data)
-                    }
-                    Some('A') => {
-                        let data: Vec<String> = local_hdu.read_col(&mut local_fptr, col_name)?;
-                        Series::new(col_name.into(), data)
-                    }
-                    _ => {
-                        return Err(Box::new(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            format!("Unsupported column type: {}", col_type),
-                        ))
-                            as Box<dyn std::error::Error + Send + Sync>);
-                    }
+                } else {
+                    // Scalar column - single column
+                    let col = match type_char {
+                        'E' => {
+                            let data: Vec<f32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let ca = Float32Chunked::from_vec(col_name.into(), data);
+                            ca.into_series().into()
+                        }
+                        'D' => {
+                            let data: Vec<f64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let ca = Float64Chunked::from_vec(col_name.into(), data);
+                            ca.into_series().into()
+                        }
+                        'J' => {
+                            let data: Vec<i32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let ca = Int32Chunked::from_vec(col_name.into(), data);
+                            ca.into_series().into()
+                        }
+                        'K' => {
+                            let data: Vec<i64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let ca = Int64Chunked::from_vec(col_name.into(), data);
+                            ca.into_series().into()
+                        }
+                        'A' => {
+                            let data: Vec<String> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let ca = StringChunked::from_iter_values(col_name.into(), data.iter().map(|s| s.as_str()));
+                            ca.into_series().into()
+                        }
+                        _ => {
+                            return Err(Box::new(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                format!("Unsupported column type: {}", col_type),
+                            )));
+                        }
+                    };
+                    vec![col]
                 };
-
-                Ok(series.into())
+                
+                Ok(columns)
             },
         )
         .collect();
-
-    // Convert results to columns, propagating any errors
-    let columns: Result<Vec<Column>, _> = results.into_iter().collect();
-
-    let df = DataFrame::new(columns.unwrap())?;
+    
+    // Flatten the results and collect all columns
+    let mut all_columns = Vec::new();
+    for result in results {
+        let cols = result.unwrap();
+        all_columns.extend(cols);
+    }
+    
+    let df = DataFrame::new(all_columns)?;
     Ok(df)
 }
+
+// Parse TFORM string like "101E" into (repeat_count=101, type_char='E')
+fn parse_tform(tform: &str) -> Result<(usize, char), Box<dyn std::error::Error + Send + Sync>> {
+    let type_char = tform.chars().last()
+        .ok_or_else(|| std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Empty TFORM string"
+        ))?;
+    
+    let repeat_str: String = tform.chars()
+        .take_while(|c| c.is_numeric())
+        .collect();
+    
+    let repeat_count = if repeat_str.is_empty() {
+        1
+    } else {
+        repeat_str.parse::<usize>()?
+    };
+    
+    Ok((repeat_count, type_char))
+}
+
+// Expand a vector column from flat data (FITS stores vectors as flattened arrays)
+fn expand_vector_column_from_flat<T: PolarsNumericType>(
+    base_name: &str,
+    flat_data: Vec<T::Native>,
+    n_elements: usize,
+) -> Result<Vec<Column>, Box<dyn std::error::Error + Send + Sync>>
+where
+    T::Native: Send + Sync + Clone,
+    ChunkedArray<T>: IntoSeries,
+{
+    let n_rows = flat_data.len() / n_elements;
+    let mut columns = Vec::new();
+    
+    for i in 0..n_elements {
+        // Extract every n_elements-th value starting at offset i
+        let col_data: Vec<T::Native> = (0..n_rows)
+            .map(|row| flat_data[row * n_elements + i])
+            .collect();
+        
+        let col_name = format!("{}_{}", base_name, i);
+        let ca = ChunkedArray::<T>::from_vec(col_name.into(), col_data);
+        columns.push(ca.into_series().into());
+    }
+    
+    Ok(columns)
+}
+
+
 
 pub fn read_file(file_name: &str) -> DataFrame {
     match which_file(file_name) {
