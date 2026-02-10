@@ -1,0 +1,96 @@
+name: Build and Release dog
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Intel
+          - os: macos-13
+            target: x86_64-apple-darwin
+
+          # macOS Apple Silicon
+          - os: macos-14
+            target: aarch64-apple-darwin
+
+          # Linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------
+      # Install CFITSIO
+      # -----------------------------
+      - name: Install CFITSIO (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cfitsio
+
+      - name: Install CFITSIO (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcfitsio-dev
+
+      # -----------------------------
+      # Install Rust
+      # -----------------------------
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # -----------------------------
+      # Build
+      # -----------------------------
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # -----------------------------
+      # Prepare binary
+      # -----------------------------
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir dist
+
+          BIN_NAME="dog"
+
+          cp target/${{ matrix.target }}/release/${BIN_NAME} dist/${BIN_NAME}-${{ matrix.target }}
+
+          strip dist/${BIN_NAME}-${{ matrix.target }} || true
+
+      # -----------------------------
+      # Checksums
+      # -----------------------------
+      - name: Generate checksums
+        run: |
+          cd dist
+          shasum -a 256 * > SHA256SUMS
+
+      # -----------------------------
+      # Upload to Release
+      # -----------------------------
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+
