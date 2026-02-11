@@ -18,24 +18,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS Intel
-          - os: macos-13
-            target: x86_64-apple-darwin
-
-          # macOS Apple Silicon
+          # macOS (Apple Silicon runner builds both)
           - os: macos-14
             target: aarch64-apple-darwin
+
+          - os: macos-14
+            target: x86_64-apple-darwin
 
           # Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       # -----------------------------
-      # Install CFITSIO
+      # CFITSIO
       # -----------------------------
       - name: Install CFITSIO (macOS)
         if: runner.os == 'macOS'
@@ -50,7 +48,7 @@ jobs:
           sudo apt-get install -y libcfitsio-dev
 
       # -----------------------------
-      # Install Rust
+      # Rust
       # -----------------------------
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -61,36 +59,27 @@ jobs:
       # Build
       # -----------------------------
       - name: Build release
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: cargo build --release --target ${{ matrix.target }}
 
       # -----------------------------
-      # Prepare binary
+      # Package
       # -----------------------------
       - name: Package binary
         shell: bash
         run: |
           mkdir dist
+          cp target/${{ matrix.target }}/release/dog dist/dog-${{ matrix.target }}
+          strip dist/dog-${{ matrix.target }} || true
 
-          BIN_NAME="dog"
-
-          cp target/${{ matrix.target }}/release/${BIN_NAME} dist/${BIN_NAME}-${{ matrix.target }}
-
-          strip dist/${BIN_NAME}-${{ matrix.target }} || true
-
-      # -----------------------------
-      # Checksums
-      # -----------------------------
-      - name: Generate checksums
+      - name: Checksums
         run: |
           cd dist
           shasum -a 256 * > SHA256SUMS
 
-      # -----------------------------
-      # Upload to Release
-      # -----------------------------
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*
+          files: dist/*
 
