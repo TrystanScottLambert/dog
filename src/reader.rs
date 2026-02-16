@@ -1,6 +1,6 @@
 // Module which handles reading the parquet file
 
-use fitsio::FitsFile;
+use fitsio_pure::compat::fitsfile::FitsFile;
 use polars::prelude::*;
 use polars::{frame::DataFrame, prelude::ParquetReader};
 use rayon::prelude::*;
@@ -36,15 +36,15 @@ pub fn read_csv_file(path: &str) -> DataFrame {
 
 
 pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error>> {
-    let mut fptr = FitsFile::open(path)?;
+    let fptr = FitsFile::open(path)?;
     let hdu = fptr.hdu(1)?;
-    let num_cols: i64 = hdu.read_key(&mut fptr, "TFIELDS")?;
-    
+    let num_cols: i64 = hdu.read_key(&fptr, "TFIELDS")?;
+
     // Collect column metadata first
     let mut col_info = Vec::new();
     for i in 1..=num_cols {
-        let col_name: String = hdu.read_key(&mut fptr, &format!("TTYPE{}", i))?;
-        let col_type: String = hdu.read_key(&mut fptr, &format!("TFORM{}", i))?;
+        let col_name: String = hdu.read_key(&fptr, &format!("TTYPE{}", i))?;
+        let col_type: String = hdu.read_key(&fptr, &format!("TFORM{}", i))?;
         col_info.push((i, col_name, col_type));
     }
     
@@ -54,7 +54,7 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
         .map(
             |(_, col_name, col_type)| -> Result<Vec<Column>, Box<dyn std::error::Error + Send + Sync>> {
                 // Each thread needs its own file handle
-                let mut local_fptr = FitsFile::open(path)?;
+                let local_fptr = FitsFile::open(path)?;
                 let local_hdu = local_fptr.hdu(1)?;
                 
                 // Parse the column type to check for vector columns
@@ -64,19 +64,19 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
                     // Vector column - read flat data and reshape
                     match type_char {
                         'E' => {
-                            let flat_data: Vec<f32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let flat_data: Vec<f32> = local_hdu.read_col(&local_fptr, col_name)?;
                             expand_vector_column_from_flat::<Float32Type>(col_name, flat_data, repeat_count)?
                         }
                         'D' => {
-                            let flat_data: Vec<f64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let flat_data: Vec<f64> = local_hdu.read_col(&local_fptr, col_name)?;
                             expand_vector_column_from_flat::<Float64Type>(col_name, flat_data, repeat_count)?
                         }
                         'J' => {
-                            let flat_data: Vec<i32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let flat_data: Vec<i32> = local_hdu.read_col(&local_fptr, col_name)?;
                             expand_vector_column_from_flat::<Int32Type>(col_name, flat_data, repeat_count)?
                         }
                         'K' => {
-                            let flat_data: Vec<i64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let flat_data: Vec<i64> = local_hdu.read_col(&local_fptr, col_name)?;
                             expand_vector_column_from_flat::<Int64Type>(col_name, flat_data, repeat_count)?
                         }
                         _ => {
@@ -90,27 +90,27 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
                     // Scalar column - single column
                     let col = match type_char {
                         'E' => {
-                            let data: Vec<f32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let data: Vec<f32> = local_hdu.read_col(&local_fptr, col_name)?;
                             let ca = Float32Chunked::from_vec(col_name.into(), data);
                             ca.into_series().into()
                         }
                         'D' => {
-                            let data: Vec<f64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let data: Vec<f64> = local_hdu.read_col(&local_fptr, col_name)?;
                             let ca = Float64Chunked::from_vec(col_name.into(), data);
                             ca.into_series().into()
                         }
                         'J' => {
-                            let data: Vec<i32> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let data: Vec<i32> = local_hdu.read_col(&local_fptr, col_name)?;
                             let ca = Int32Chunked::from_vec(col_name.into(), data);
                             ca.into_series().into()
                         }
                         'K' => {
-                            let data: Vec<i64> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let data: Vec<i64> = local_hdu.read_col(&local_fptr, col_name)?;
                             let ca = Int64Chunked::from_vec(col_name.into(), data);
                             ca.into_series().into()
                         }
                         'A' => {
-                            let data: Vec<String> = local_hdu.read_col(&mut local_fptr, col_name)?;
+                            let data: Vec<String> = local_hdu.read_col(&local_fptr, col_name)?;
                             let ca = StringChunked::from_iter_values(col_name.into(), data.iter().map(|s| s.as_str()));
                             ca.into_series().into()
                         }
