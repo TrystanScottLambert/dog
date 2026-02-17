@@ -247,18 +247,18 @@ checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
 name = "bytemuck"
-version = "1.22.0"
+version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6b1fc10dbac614ebc03540c9dbd60e83887fda27794998c6528f1782047d540"
+checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
 dependencies = [
  "bytemuck_derive",
 ]
 
 [[package]]
 name = "bytemuck_derive"
-version = "1.9.3"
+version = "1.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ecc273b49b3205b83d648f0690daa588925572cc5063745bfe547fe7ec8e1a1"
+checksum = "f9abbd1bc6865053c427f7198e6af43bfdedc55ab791faed4fbd361d789575ff"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -490,7 +490,7 @@ name = "dog"
 version = "0.3.1"
 dependencies = [
  "clap",
- "fitsio",
+ "fitsio-pure",
  "polars",
  "rayon",
 ]
@@ -554,22 +554,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8eb564c5c7423d25c886fb561d1e4ee69f72354d16918afa32c08811f6b6a55"
 
 [[package]]
-name = "fitsio"
-version = "0.21.9"
+name = "fitsio-pure"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a37418b8a2e67655b4717287f3c170945ca5f453355a02274250b69400148f4"
+checksum = "2ca48d4628ccda1011fb25581b6001eb61490d27d4433029db65bd63aa9096da"
 dependencies = [
- "fitsio-sys",
- "libc",
-]
-
-[[package]]
-name = "fitsio-sys"
-version = "0.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14929d0b6fa44a87b374a138ea2256c02c1b5beae1dbc98f62a3e132f862fed1"
-dependencies = [
- "pkg-config",
+ "bytemuck",
 ]
 
 [[package]]

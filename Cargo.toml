@@ -5,6 +5,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
-fitsio = "0.21.9"
+fitsio-pure = { version = "0.9.4", features = ["compat"] }
 polars = {version = "0.46.0", features=["parquet", "csv",  "dtype-i16"]}
 rayon = "1.11.0"

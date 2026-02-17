@@ -33,21 +33,6 @@ jobs:
       - uses: actions/checkout@v4
 
       # -----------------------------
-      # CFITSIO
-      # -----------------------------
-      - name: Install CFITSIO (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install cfitsio
-
-      - name: Install CFITSIO (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcfitsio-dev
-
-      # -----------------------------
       # Rust
       # -----------------------------
       - name: Install Rust
