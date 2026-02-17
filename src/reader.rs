@@ -114,6 +114,11 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
                             let ca = StringChunked::from_iter_values(col_name.into(), data.iter().map(|s| s.as_str()));
                             ca.into_series().into()
                         }
+                        'I' => {
+                            let data: Vec<i32> = local_hdu.read_col(&local_fptr, col_name)?;
+                            let ca = Int32Chunked::from_vec(col_name.into(), data);
+                            ca.into_series().into()
+                        }
                         _ => {
                             return Err(Box::new(std::io::Error::new(
                                 std::io::ErrorKind::InvalidData,
