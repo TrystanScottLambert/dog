@@ -59,8 +59,11 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
                 
                 // Parse the column type to check for vector columns
                 let (repeat_count, type_char) = parse_tform(col_type)?;
+                dbg!(&type_char);
+                dbg!(&repeat_count);
+                dbg!(&col_name);
                 
-                let columns = if repeat_count > 1 {
+                let columns = if repeat_count > 1 && type_char != 'A' {
                     // Vector column - read flat data and reshape
                     match type_char {
                         'E' => {
@@ -79,6 +82,7 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
                             let flat_data: Vec<i64> = local_hdu.read_col(&local_fptr, col_name)?;
                             expand_vector_column_from_flat::<Int64Type>(col_name, flat_data, repeat_count)?
                         }
+
                         _ => {
                             return Err(Box::new(std::io::Error::new(
                                 std::io::ErrorKind::InvalidData,
