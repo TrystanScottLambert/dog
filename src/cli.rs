@@ -31,16 +31,20 @@ pub fn build_cli() -> Command {
             Arg::new("tail")
                 .short('t')
                 .long("tail")
-                .help("Prints the bottom ten rows of data.")
+                .help("Prints the bottom `n` rows of data.")
                 .action(ArgAction::SetTrue)
+                .num_args(1)
+                .value_name("n")
                 .conflicts_with("head"),
         )
         .arg(
             Arg::new("head")
                 .short('H')
                 .long("head")
-                .help("Prints the top ten rows of data and the column names.")
+                .help("Prints the top `n` rows of data and the column names.")
                 .action(ArgAction::SetTrue)
+                .num_args(1)
+                .value_name("n")
                 .conflicts_with("tail"),
         )
         .arg(

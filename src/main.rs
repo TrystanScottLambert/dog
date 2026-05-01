@@ -24,14 +24,17 @@ fn handle_arguments(matches: ArgMatches) {
         lazy_frame = lazy_frame.select(columns);
     }
 
+    let rows_from_bottom = *matches.get_one::<u32>("tail").unwrap_or(&10);
+    let rows_from_top = *matches.get_one::<u32>("head").unwrap_or(&10);
+
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
         print_column_names(&mut lazy_frame);
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
         print_only_data(lazy_frame, false);
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-        print_tail(lazy_frame);
+        print_tail(lazy_frame, rows_from_bottom);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
-        print_head(&mut lazy_frame);
+        print_head(&mut lazy_frame, rows_from_top);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_metadata(&file_path);
     } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {

@@ -4,7 +4,7 @@ use fitsio_pure::compat::fitsfile::FitsFile;
 use polars::prelude::*;
 use polars::{frame::DataFrame};
 use rayon::prelude::*;
-use std::path::{PathBuf};
+use std::path::{PathBuf, Path};
 
 pub enum FileType {
     Fits,
@@ -12,7 +12,7 @@ pub enum FileType {
     Parquet,
 }
 
-pub fn which_file(file_name: &PathBuf) -> FileType {
+pub fn which_file(file_name: &Path) -> FileType {
     match file_name.extension().expect("No file extension found").to_str().expect("Couldn't convert extensions to unicode.") {
         "parquet" => FileType::Parquet,
         "csv" => FileType::Csv,
