@@ -32,8 +32,7 @@ curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3
 chmod +x dog-x86_64-apple-darwin
 sudo mv dog-x86_64-apple-darwin /usr/local/bin/dog
 ```
-```
-```
+
 
 should work. 
 
@@ -44,8 +43,7 @@ curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3
 chmod +x dog-x86_64-unknown-linux-gnu
 sudo mv dog-x86_64-unknown-linux-gnu /usr/local/bin/dog
 ```
-```
-```
+
 You may need to start a new terminal to get it working.
 
 If you don't want to install the binary or are running a more exotic distribution of linux, then you can compile the program from source using 'cargo'. 
