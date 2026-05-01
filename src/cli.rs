@@ -81,8 +81,8 @@ pub fn build_cli() -> Command {
         )
         .arg(
             Arg::new("convert")
-            .long("convert")
-            .help("Attempts to convert csv and fits file into a parquet if it can.")
-            .action(ArgAction::SetTrue)
+                .long("convert")
+                .help("Attempts to convert csv and fits file into a parquet if it can.")
+                .action(ArgAction::SetTrue),
         )
 }
