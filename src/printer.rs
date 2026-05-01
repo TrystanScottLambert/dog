@@ -1,15 +1,15 @@
 // printing module handling all printing functions and routines
 
 use polars::prelude::*;
-use polars::{
-    frame::DataFrame,
-    prelude::{Column, CsvWriter},
-};
+use polars::prelude::{Column, CsvWriter};
 use std::fs::File;
+use std::path::PathBuf;
 
-pub fn print_only_data(data_frame: DataFrame, include_header: bool) {
+pub fn print_only_data(lazy_frame: LazyFrame, include_header: bool) {
     let mut out = std::io::stdout().lock();
-    let mut df = data_frame.clone(); // Make a mutable copy just for writing
+    let mut df = lazy_frame
+        .collect()
+        .expect("Error converting to data frame.");
 
     if include_header {
         CsvWriter::new(&mut out)
@@ -25,7 +25,7 @@ pub fn print_only_data(data_frame: DataFrame, include_header: bool) {
     }
 }
 
-pub fn print_metadata(file_name: &str) {
+pub fn print_metadata(file_name: &PathBuf) {
     let file = File::open(file_name).expect("Problem reading file file.");
     let schema = ParquetReader::new(file)
         .schema()
@@ -33,7 +33,7 @@ pub fn print_metadata(file_name: &str) {
     println!("{:#?}", schema);
 }
 
-pub fn print_waves_metadata(file_name: &str) {
+pub fn print_waves_metadata(file_name: &PathBuf) {
     let file = File::open(file_name).expect("Problem reading file.");
     let mut reader = ParquetReader::new(file);
 
@@ -59,17 +59,23 @@ pub fn print_waves_metadata(file_name: &str) {
     }
 }
 
-pub fn print_column_names(data_frame: DataFrame) {
-    let col_names = data_frame.get_column_names_str();
+pub fn print_column_names(lazy_frame: &mut LazyFrame) {
+    let col_names: Vec<String> = lazy_frame
+        .collect_schema()
+        .expect("Schema couldn't be resolved")
+        .iter_names()
+        .map(|name| name.to_string())
+        .collect();
     println!("{}", col_names.join("\n"));
 }
 
-fn print_catlike(data_frame: DataFrame) {
+fn print_catlike(lazy_frame: LazyFrame) {
     // prints the data frame on a row x row basis like cat would.
-    let height = data_frame.height();
-    let columns = data_frame.get_columns();
+    let df = lazy_frame.collect().expect("Couldn't convert lf to df.");
+    let number_of_rows = df.height();
+    let columns = df.get_columns();
 
-    for i in 0..height {
+    for i in 0..number_of_rows {
         let row_vals: Vec<String> = columns
             .iter()
             .map(|s| format!("{}", s.get(i).unwrap()))
@@ -78,14 +84,15 @@ fn print_catlike(data_frame: DataFrame) {
     }
 }
 
-pub fn print_tail(data_frame: DataFrame) {
-    let tail = data_frame.tail(Some(10));
+pub fn print_tail(lazy_frame: LazyFrame) {
+    let tail = lazy_frame.tail(10);
     print_catlike(tail);
 }
 
-pub fn print_head(data_frame: DataFrame) {
-    let head = data_frame.head(Some(10));
-    print_column_names(data_frame);
+pub fn print_head(lazy_frame: &mut LazyFrame) {
+    let head_frame = lazy_frame.clone();
+    let head = head_frame.slice(0, 10);
+    print_column_names(lazy_frame);
     print_catlike(head);
 }
 
@@ -121,9 +128,10 @@ fn print_col_summary(column: &Column) {
     }
 }
 
-pub fn print_summary(reader: DataFrame) {
-    let column_data = reader.get_columns();
-    let (number_of_rows, number_of_columns) = reader.shape();
+pub fn print_summary(lazy_frame: LazyFrame) {
+    let df = lazy_frame.collect().expect("Couldn't convert");
+    let column_data = df.get_columns();
+    let (number_of_rows, number_of_columns) = df.shape();
 
     print!("Number of Rows: {number_of_rows}\nNumber of columns: {number_of_columns} \n\n");
 
@@ -132,7 +140,7 @@ pub fn print_summary(reader: DataFrame) {
     }
 }
 
-pub fn peak(data_frame: DataFrame) {
+pub fn peak(lazy_frame: LazyFrame) {
     // prints out the polars data frame as 'peak'.
-    println!("{:?}", data_frame)
+    println!("{:?}", lazy_frame.collect().unwrap())
 }

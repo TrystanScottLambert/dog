@@ -2,9 +2,9 @@
 
 use fitsio_pure::compat::fitsfile::FitsFile;
 use polars::prelude::*;
-use polars::{frame::DataFrame, prelude::ParquetReader};
+use polars::{frame::DataFrame};
 use rayon::prelude::*;
-use std::fs::File;
+use std::path::{PathBuf};
 
 pub enum FileType {
     Fits,
@@ -12,9 +12,8 @@ pub enum FileType {
     Parquet,
 }
 
-pub fn which_file(file_name: &str) -> FileType {
-    let vals = file_name.split(".");
-    match vals.last().unwrap() {
+pub fn which_file(file_name: &PathBuf) -> FileType {
+    match file_name.extension().expect("No file extension found").to_str().expect("Couldn't convert extensions to unicode.") {
         "parquet" => FileType::Parquet,
         "csv" => FileType::Csv,
         "fits" => FileType::Fits,
@@ -22,20 +21,16 @@ pub fn which_file(file_name: &str) -> FileType {
     }
 }
 
-pub fn read_parquet_file(file_name: &str) -> DataFrame {
-    let mut file = File::open(file_name).expect("Failed to open file");
-    ParquetReader::new(&mut file)
-        .finish()
-        .expect("Failed to parse parquet.")
+pub fn read_parquet_file(file_name: PathBuf)-> LazyFrame {
+    LazyFrame::scan_parquet_files(Arc::new([file_name]), ScanArgsParquet::default()).expect("Couldn't read parquet file.")
 }
 
-pub fn read_csv_file(path: &str) -> DataFrame {
-    let mut file = File::open(path).expect("Can't find message.");
-    CsvReader::new(&mut file).finish().expect("Failed parsing.")
+pub fn read_csv_file(path: PathBuf) -> LazyFrame {
+    LazyCsvReader::new(path).finish().expect("Failed parsing csv")
 }
 
 
-pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error>> {
+pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame, Box<dyn std::error::Error>> {
     let fptr = FitsFile::open(path)?;
     let hdu = fptr.hdu(1)?;
     let num_cols: i64 = hdu.read_key(&fptr, "TFIELDS")?;
@@ -146,7 +141,7 @@ pub fn read_fits_file(path: &str) -> Result<DataFrame, Box<dyn std::error::Error
     }
     
     let df = DataFrame::new(all_columns)?;
-    Ok(df)
+    Ok(df.lazy())
 }
 
 // Parse TFORM string like "101E" into (repeat_count=101, type_char='E')
@@ -199,10 +194,10 @@ where
 
 
 
-pub fn read_file(file_name: &str) -> DataFrame {
-    match which_file(file_name) {
+pub fn read_file(file_name: PathBuf) -> LazyFrame {
+    match which_file(&file_name) {
         FileType::Csv => read_csv_file(file_name),
         FileType::Parquet => read_parquet_file(file_name),
-        FileType::Fits => read_fits_file(file_name).unwrap(),
+        FileType::Fits => read_fits_file(&file_name).unwrap(),
     }
 }

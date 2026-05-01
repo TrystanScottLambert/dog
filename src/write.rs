@@ -1,12 +1,14 @@
 use polars::prelude::*;
-use std::fs::File;
+use std::{fs::File, path::PathBuf};
 
-
-pub fn write_parquet(df: &mut DataFrame, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn write_parquet(
+    lazy_frame: LazyFrame,
+    output_path: &PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::create(output_path)?;
-    
-    ParquetWriter::new(file)
-        .finish(df)?;
-    
+    let mut df = lazy_frame.collect().unwrap();
+
+    ParquetWriter::new(file).finish(&mut df)?;
+
     Ok(())
 }

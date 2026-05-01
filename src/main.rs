@@ -3,48 +3,52 @@ mod printer;
 mod reader;
 mod write;
 
+use std::path::PathBuf;
+
 use crate::printer::*;
 use crate::reader::{read_file, which_file, FileType};
 use crate::write::write_parquet;
 use clap::ArgMatches;
+use polars::prelude::*;
 
 fn handle_arguments(matches: ArgMatches) {
     let file = matches
         .get_one::<String>("file")
         .expect("File argument missing");
-    let mut data_frame = read_file(file);
+    let file_path = PathBuf::from(file);
+    let mut lazy_frame = read_file(file_path.clone());
 
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
-        let columns: Vec<String> = columns.map(|s| s.to_string()).collect();
-        data_frame = data_frame.select(columns).expect("Column naming mismatch.");
+        let columns: Vec<Expr> = columns.map(|s| col(s)).collect();
+        lazy_frame = lazy_frame.select(columns);
     }
 
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
-        print_column_names(data_frame);
+        print_column_names(&mut lazy_frame);
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
-        print_only_data(data_frame, false);
+        print_only_data(lazy_frame, false);
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-        print_tail(data_frame);
+        print_tail(lazy_frame);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
-        print_head(data_frame);
+        print_head(&mut lazy_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
-        print_metadata(file);
+        print_metadata(&file_path);
     } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {
-        print_waves_metadata(file);
+        print_waves_metadata(&file_path);
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
-        print_summary(data_frame);
+        print_summary(lazy_frame);
     } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
-        peak(data_frame);
+        peak(lazy_frame);
     } else if *matches.get_one::<bool>("convert").unwrap_or(&false) {
-        let outfile = match which_file(file) {
-            FileType::Csv => file.replace(".csv", "_converted.parquet"),
-            FileType::Fits => file.replace(".fits", "_converted.parquet"),
+        let outfile = match which_file(&file_path) {
+            FileType::Csv => PathBuf::from(file.replace(".csv", "_converted.parquet")),
+            FileType::Fits => PathBuf::from(file.replace(".fits", "_converted.parquet")),
             FileType::Parquet => panic!("File is already a parquet!"),
         };
-        write_parquet(&mut data_frame, &outfile).unwrap();
+        write_parquet(lazy_frame, &outfile).unwrap();
     } else {
-        print_only_data(data_frame, true);
+        print_only_data(lazy_frame, true);
     }
 }
 
