@@ -20,7 +20,7 @@ fn handle_arguments(matches: ArgMatches) {
 
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
-        let columns: Vec<Expr> = columns.map(|s| col(s)).collect();
+        let columns: Vec<Expr> = columns.map(col).collect();
         lazy_frame = lazy_frame.select(columns);
     }
 
