@@ -24,8 +24,6 @@ fn handle_arguments(matches: ArgMatches) {
         lazy_frame = lazy_frame.select(columns);
     }
 
-    let rows_from_bottom = *matches.get_one::<u32>("tail").unwrap_or(&10);
-    let rows_from_top = *matches.get_one::<u32>("head").unwrap_or(&10);
 
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
         print_column_names(&mut lazy_frame);
