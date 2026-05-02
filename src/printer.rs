@@ -1,5 +1,6 @@
 // printing module handling all printing functions and routines
 
+use core::num;
 use polars::prelude::*;
 use polars::prelude::{Column, CsvWriter};
 use std::fs::File;
@@ -11,18 +12,11 @@ pub fn print_only_data(lazy_frame: LazyFrame, include_header: bool) {
         .collect()
         .expect("Error converting to data frame.");
 
-    if include_header {
-        CsvWriter::new(&mut out)
-            .include_header(true)
-            .with_separator(b' ')
-            .finish(&mut df)
-            .expect("Failed to write full CSV to stdout");
-    } else {
-        CsvWriter::new(&mut out)
-            .with_separator(b' ')
-            .finish(&mut df)
-            .expect("Failed to write full CSV to stdout");
-    }
+    CsvWriter::new(&mut out)
+        .include_header(include_header)
+        .with_separator(b' ')
+        .finish(&mut df)
+        .expect("Failed to write full CSV to stdout");
 }
 
 pub fn print_schema(lazy_frame: LazyFrame) {
@@ -135,20 +129,25 @@ fn get_number_columns(lazy_frame: LazyFrame) -> u32 {
 }
 
 pub fn print_summary(lazy_frame: LazyFrame) {
+    let df: DataFrame;
     let number_of_rows = get_number_rows(lazy_frame.clone());
     let number_of_columns = get_number_columns(lazy_frame.clone());
+    if number_of_rows < 6 {
+        df = lazy_frame.collect().expect("Can't convert to dataframe");
+    } else {
+        let df_head = lazy_frame
+            .clone()
+            .slice(0, 3)
+            .collect()
+            .expect("Couldn't convert head ");
+        let df_tail = lazy_frame
+            .clone()
+            .tail(3)
+            .collect()
+            .expect("Couldn't convert");
+        df = df_head.vstack(&df_tail).unwrap();
+    }
 
-    let df_head = lazy_frame
-        .clone()
-        .slice(0, 3)
-        .collect()
-        .expect("Couldn't convert head ");
-    let df_tail = lazy_frame
-        .clone()
-        .tail(3)
-        .collect()
-        .expect("Couldn't convert");
-    let df = df_head.vstack(&df_tail).unwrap();
     let column_data = df.columns();
 
     print!("Number of Rows: {number_of_rows}\nNumber of columns: {number_of_columns} \n\n");
@@ -157,7 +156,7 @@ pub fn print_summary(lazy_frame: LazyFrame) {
         .iter()
         .map(create_col_summary_string)
         .collect::<Vec<String>>();
-    println!("{}", summaries.join(","));
+    println!("{}", summaries.join("\n"));
 }
 
 pub fn peak(lazy_frame: LazyFrame) {
