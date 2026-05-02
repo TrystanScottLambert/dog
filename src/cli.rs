@@ -44,10 +44,9 @@ pub fn build_cli() -> Command {
                 .conflicts_with("tail"),
         )
         .arg(
-            Arg::new("META")
-                .short('M')
-                .long("META")
-                .help("Forcefully prints metadata schema without any formatting.")
+            Arg::new("schema")
+                .long("schema")
+                .help("Prints metadata schema.")
                 .action(ArgAction::SetTrue),
         )
         .arg(

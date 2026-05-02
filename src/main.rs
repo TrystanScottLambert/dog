@@ -33,7 +33,7 @@ fn handle_arguments(matches: ArgMatches) {
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
         print_head(&mut lazy_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
-        print_metadata(&file_path);
+        print_schema(lazy_frame);
     } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {
         print_waves_metadata(&file_path);
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {

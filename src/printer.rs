@@ -25,12 +25,12 @@ pub fn print_only_data(lazy_frame: LazyFrame, include_header: bool) {
     }
 }
 
-pub fn print_metadata(file_name: &PathBuf) {
-    let file = File::open(file_name).expect("Problem reading file file.");
-    let schema = ParquetReader::new(file)
-        .schema()
-        .expect("Problem reading header.");
-    println!("{:#?}", schema);
+pub fn print_schema(lazy_frame: LazyFrame) {
+    let mut mut_lazyframe = lazy_frame;
+    let schema = mut_lazyframe
+        .collect_schema()
+        .expect("Trouble Reading Schema");
+    println!("{:#?}", schema)
 }
 
 pub fn print_waves_metadata(file_name: &PathBuf) {
