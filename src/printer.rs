@@ -11,26 +11,19 @@ pub fn print_only_data(lazy_frame: LazyFrame, include_header: bool) {
         .collect()
         .expect("Error converting to data frame.");
 
-    if include_header {
-        CsvWriter::new(&mut out)
-            .include_header(true)
-            .with_separator(b' ')
-            .finish(&mut df)
-            .expect("Failed to write full CSV to stdout");
-    } else {
-        CsvWriter::new(&mut out)
-            .with_separator(b' ')
-            .finish(&mut df)
-            .expect("Failed to write full CSV to stdout");
-    }
+    CsvWriter::new(&mut out)
+        .include_header(include_header)
+        .with_separator(b' ')
+        .finish(&mut df)
+        .expect("Failed to write full CSV to stdout");
 }
 
-pub fn print_metadata(file_name: &PathBuf) {
-    let file = File::open(file_name).expect("Problem reading file file.");
-    let schema = ParquetReader::new(file)
-        .schema()
-        .expect("Problem reading header.");
-    println!("{:#?}", schema);
+pub fn print_schema(lazy_frame: LazyFrame) {
+    let mut mut_lazyframe = lazy_frame;
+    let schema = mut_lazyframe
+        .collect_schema()
+        .expect("Trouble Reading Schema");
+    println!("{:#?}", schema)
 }
 
 pub fn print_waves_metadata(file_name: &PathBuf) {
@@ -96,48 +89,73 @@ pub fn print_head(lazy_frame: &mut LazyFrame) {
     print_catlike(head);
 }
 
-fn print_col_summary(column: &Column) {
-    if column.len() > 6 {
-        let top_col = column.head(Some(3));
-        let bottom_col = column.tail(Some(3));
-        let mut output = Vec::new();
-
-        for series in top_col.as_series().into_iter() {
-            for val in series.iter() {
-                output.push(format!("{}", val));
-            }
+fn create_col_summary_string(column: &Column) -> String {
+    let mut output = Vec::new();
+    for series in column.as_series().into_iter() {
+        for val in series.iter() {
+            output.push(format!("{}", val));
         }
-
-        output.push("...".to_string());
-        for series in bottom_col.as_series().into_iter() {
-            for val in series.iter() {
-                output.push(format!("{}", val));
-            }
-        }
-        println!("{}: [{}]", column.name(), output.join(","))
-    } else {
-        let top_col = column.head(Some(column.len()));
-        let mut output = Vec::new();
-
-        for series in top_col.as_series().into_iter() {
-            for val in series.iter() {
-                output.push(format!("{}", val));
-            }
-        }
-        println!("{}: [{}]", column.name(), output.join(","))
     }
+
+    if column.len() == 6 {
+        output.insert(3, "...".to_string());
+    } else if column.len() > 6 {
+        panic!("There should not be more than 6 items in the summary row.")
+    }
+
+    format!("{}: [{}]", column.name(), output.join(","))
+}
+
+fn get_number_rows(lazy_frame: LazyFrame) -> u32 {
+    // Source - https://stackoverflow.com/a/73534468
+    // Posted by Niklas Mohrin, modified by community. See post 'Timeline' for change history
+    // Retrieved 2026-05-02, License - CC BY-SA 4.0
+    lazy_frame
+        .select([len().alias("count")])
+        .collect()
+        .unwrap()
+        .column("count")
+        .unwrap()
+        .u32()
+        .unwrap()
+        .get(0)
+        .unwrap()
+}
+
+fn get_number_columns(lazy_frame: LazyFrame) -> u32 {
+    let mut mut_lazyframe = lazy_frame;
+    mut_lazyframe.collect_schema().unwrap().len() as u32
 }
 
 pub fn print_summary(lazy_frame: LazyFrame) {
-    let df = lazy_frame.collect().expect("Couldn't convert");
+    let df: DataFrame;
+    let number_of_rows = get_number_rows(lazy_frame.clone());
+    let number_of_columns = get_number_columns(lazy_frame.clone());
+    if number_of_rows < 6 {
+        df = lazy_frame.collect().expect("Can't convert to dataframe");
+    } else {
+        let df_head = lazy_frame
+            .clone()
+            .slice(0, 3)
+            .collect()
+            .expect("Couldn't convert head ");
+        let df_tail = lazy_frame
+            .clone()
+            .tail(3)
+            .collect()
+            .expect("Couldn't convert");
+        df = df_head.vstack(&df_tail).unwrap();
+    }
+
     let column_data = df.columns();
-    let (number_of_rows, number_of_columns) = df.shape();
 
     print!("Number of Rows: {number_of_rows}\nNumber of columns: {number_of_columns} \n\n");
 
-    for column in column_data.iter() {
-        print_col_summary(column);
-    }
+    let summaries = column_data
+        .iter()
+        .map(create_col_summary_string)
+        .collect::<Vec<String>>();
+    println!("{}", summaries.join("\n"));
 }
 
 pub fn peak(lazy_frame: LazyFrame) {

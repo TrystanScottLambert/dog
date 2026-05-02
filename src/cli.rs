@@ -44,10 +44,9 @@ pub fn build_cli() -> Command {
                 .conflicts_with("tail"),
         )
         .arg(
-            Arg::new("META")
-                .short('M')
-                .long("META")
-                .help("Forcefully prints metadata schema without any formatting.")
+            Arg::new("schema")
+                .long("schema")
+                .help("Prints metadata schema.")
                 .action(ArgAction::SetTrue),
         )
         .arg(
@@ -82,7 +81,7 @@ pub fn build_cli() -> Command {
         .arg(
             Arg::new("convert")
                 .long("convert")
-                .help("Attempts to convert csv and fits file into a parquet if it can.")
+                .help("Attempts to convert csv and fits files into a parquet if it can.")
                 .action(ArgAction::SetTrue),
         )
 }
