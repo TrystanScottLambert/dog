@@ -21,14 +21,14 @@ The first step is to determine what architecture your system is running. This ca
 For Mac-OS the binaries can be downloaded for newer macs running m-chips (arm64)
 **Installing dog is very easy**
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3.5/dog-aarch64-apple-darwin
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.0/dog-aarch64-apple-darwin
 chmod +x dog-aarch64-apple-darwin
 sudo mv dog-aarch64-apple-darwin /usr/local/bin/dog
 ```
 
 For older models then:
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3.5/dog-x86_64-apple-darwin
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.0/dog-x86_64-apple-darwin
 chmod +x dog-x86_64-apple-darwin
 sudo mv dog-x86_64-apple-darwin /usr/local/bin/dog
 ```
@@ -39,7 +39,7 @@ should work.
 ### Linux
 Ubuntu/debian flavors of linux should work with:
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.3.5/dog-x86_64-unknown-linux-gnu
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.0/dog-x86_64-unknown-linux-gnu
 chmod +x dog-x86_64-unknown-linux-gnu
 sudo mv dog-x86_64-unknown-linux-gnu /usr/local/bin/dog
 ```
