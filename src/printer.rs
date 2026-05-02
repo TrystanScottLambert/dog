@@ -60,7 +60,7 @@ pub fn print_column_names(lazy_frame: &mut LazyFrame) {
         .iter_names()
         .map(|name| name.to_string())
         .collect();
-    println!("{}", col_names.join("\n"));
+    println!("{}", col_names.join("\n").green());
 }
 
 fn print_catlike(lazy_frame: LazyFrame) {
