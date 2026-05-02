@@ -1,5 +1,6 @@
 // printing module handling all printing functions and routines
 
+use colored::Colorize;
 use polars::prelude::*;
 use polars::prelude::{Column, CsvWriter};
 use std::fs::File;
@@ -98,12 +99,18 @@ fn create_col_summary_string(column: &Column) -> String {
     }
 
     if column.len() == 6 {
-        output.insert(3, "...".to_string());
+        output.insert(3, "…".to_string());
     } else if column.len() > 6 {
         panic!("There should not be more than 6 items in the summary row.")
     }
 
-    format!("{}: [{}]", column.name(), output.join(","))
+    format!(
+        "{}{}{}{}",
+        column.name().blue(),
+        ": [".bold(),
+        output.join(", "),
+        "]".bold()
+    )
 }
 
 fn get_number_rows(lazy_frame: LazyFrame) -> u32 {
@@ -149,7 +156,13 @@ pub fn print_summary(lazy_frame: LazyFrame) {
 
     let column_data = df.columns();
 
-    print!("Number of Rows: {number_of_rows}\nNumber of columns: {number_of_columns} \n\n");
+    print!(
+        "{}{}\n{}{}\n\n",
+        "Number of Rows: ".bold(),
+        number_of_rows.to_string().green(),
+        "Number of columns: ".bold(),
+        number_of_columns.to_string().green()
+    );
 
     let summaries = column_data
         .iter()
