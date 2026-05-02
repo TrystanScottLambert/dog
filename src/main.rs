@@ -24,15 +24,14 @@ fn handle_arguments(matches: ArgMatches) {
         lazy_frame = lazy_frame.select(columns);
     }
 
-
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
         print_column_names(&mut lazy_frame);
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
         print_only_data(lazy_frame, false);
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-        print_tail(lazy_frame, rows_from_bottom);
+        print_tail(lazy_frame);
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
-        print_head(&mut lazy_frame, rows_from_top);
+        print_head(&mut lazy_frame);
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_metadata(&file_path);
     } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {

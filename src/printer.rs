@@ -84,14 +84,14 @@ fn print_catlike(lazy_frame: LazyFrame) {
     }
 }
 
-pub fn print_tail(lazy_frame: LazyFrame, rows_from_bottom: u32) {
-    let tail = lazy_frame.tail(rows_from_bottom);
+pub fn print_tail(lazy_frame: LazyFrame) {
+    let tail = lazy_frame.tail(10);
     print_catlike(tail);
 }
 
-pub fn print_head(lazy_frame: &mut LazyFrame, rows_from_top: u32) {
+pub fn print_head(lazy_frame: &mut LazyFrame) {
     let head_frame = lazy_frame.clone();
-    let head = head_frame.slice(0, rows_from_top);
+    let head = head_frame.slice(0, 10);
     print_column_names(lazy_frame);
     print_catlike(head);
 }
