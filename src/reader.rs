@@ -3,8 +3,8 @@
 use fitsio_pure::compat::fitsfile::FitsFile;
 use polars::prelude::*;
 use polars::{frame::DataFrame};
-use rayon::prelude::*;
 use std::path::{PathBuf, Path};
+use rayon::prelude::*;
 
 pub enum FileType {
     Fits,
@@ -22,11 +22,11 @@ pub fn which_file(file_name: &Path) -> FileType {
 }
 
 pub fn read_parquet_file(file_name: PathBuf)-> LazyFrame {
-    LazyFrame::scan_parquet_files(Arc::new([file_name]), ScanArgsParquet::default()).expect("Couldn't read parquet file.")
+    LazyFrame::scan_parquet_files(vec![PlRefPath::new(file_name.to_str().unwrap())].into(), ScanArgsParquet::default()).expect("Couldn't read parquet file.")
 }
 
 pub fn read_csv_file(path: PathBuf) -> LazyFrame {
-    LazyCsvReader::new(path).finish().expect("Failed parsing csv")
+    LazyCsvReader::new(PlRefPath::new(path.to_str().unwrap())).finish().expect("Failed parsing csv")
 }
 
 
@@ -140,7 +140,7 @@ pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame, Box<dyn std::error::E
         all_columns.extend(cols);
     }
     
-    let df = DataFrame::new(all_columns)?;
+    let df = DataFrame::new(all_columns.first().expect("No columns").len(), all_columns)?;
     Ok(df.lazy())
 }
 

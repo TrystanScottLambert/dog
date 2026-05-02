@@ -73,7 +73,7 @@ fn print_catlike(lazy_frame: LazyFrame) {
     // prints the data frame on a row x row basis like cat would.
     let df = lazy_frame.collect().expect("Couldn't convert lf to df.");
     let number_of_rows = df.height();
-    let columns = df.get_columns();
+    let columns = df.columns();
 
     for i in 0..number_of_rows {
         let row_vals: Vec<String> = columns
@@ -130,7 +130,7 @@ fn print_col_summary(column: &Column) {
 
 pub fn print_summary(lazy_frame: LazyFrame) {
     let df = lazy_frame.collect().expect("Couldn't convert");
-    let column_data = df.get_columns();
+    let column_data = df.columns();
     let (number_of_rows, number_of_columns) = df.shape();
 
     print!("Number of Rows: {number_of_rows}\nNumber of columns: {number_of_columns} \n\n");
