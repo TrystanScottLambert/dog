@@ -156,10 +156,10 @@ dog -p test_file.parquet
 ```
 However, more often than not, columns and rows will be emitted except for a couple at the corners.
 
-### Metadata
-The metadata of the dataframe can also be printed, but in this case this is only the schema which might be incomplete. Future releases will have better meta data handling.
+### Schema
+The schema in the metadata of the parquet file can also be printed, but in this case this is only the schema which might be incomplete. 
 ```
-dog -M test_file.parquet
+dog --schema test_file.parquet
 ```
 
 ### MAML metadata
