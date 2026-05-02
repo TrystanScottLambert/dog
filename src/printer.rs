@@ -1,6 +1,5 @@
 // printing module handling all printing functions and routines
 
-use core::num;
 use polars::prelude::*;
 use polars::prelude::{Column, CsvWriter};
 use std::fs::File;
