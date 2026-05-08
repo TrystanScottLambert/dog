@@ -660,12 +660,14 @@ dependencies = [
 name = "dog"
 version = "0.4.0"
 dependencies = [
+ "anyhow",
  "clap",
  "colored",
  "fitsio-pure",
  "polars",
  "polars-buffer",
  "rayon",
+ "thiserror",
 ]
 
 [[package]]

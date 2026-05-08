@@ -4,9 +4,11 @@ version = "0.4.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
 colored = "3.1.1"
 fitsio-pure = { version = "0.11.0", features = ["compat"] }
 polars = { version = "0.53.0", features = ["parquet", "csv", "dtype-i16", "lazy"] }
 polars-buffer = "0.53.0"
 rayon = "1.12.0"
+thiserror = "2.0.18"
