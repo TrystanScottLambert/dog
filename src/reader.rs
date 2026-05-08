@@ -1,10 +1,10 @@
-// Module which handles reading the parquet file
-
 use fitsio_pure::compat::fitsfile::FitsFile;
 use polars::prelude::*;
 use polars::{frame::DataFrame};
 use std::path::{PathBuf, Path};
 use rayon::prelude::*;
+use anyhow::{Result, Context, anyhow};
+
 
 pub enum FileType {
     Fits,
@@ -12,12 +12,16 @@ pub enum FileType {
     Parquet,
 }
 
-pub fn which_file(file_name: &Path) -> FileType {
-    match file_name.extension().expect("No file extension found").to_str().expect("Couldn't convert extensions to unicode.") {
-        "parquet" => FileType::Parquet,
-        "csv" => FileType::Csv,
-        "fits" => FileType::Fits,
-        _ => FileType::Parquet,
+pub fn which_file(file_name: &Path) -> Result<FileType> {
+    let extension = match file_name.extension() {
+        Some(t) => t.to_str().context("Failed to convert OS string to str"),
+        None => Err(anyhow!("{file_name:?} has no extension. Don't know how to read it."))
+    };
+    match extension? {
+        "parquet" => Ok(FileType::Parquet),
+        "csv" => Ok(FileType::Csv),
+        "fits" => Ok(FileType::Fits),
+        _ => Err(anyhow!("{file_name:?} has an unsupported extension")),
     }
 }
 
@@ -194,10 +198,10 @@ where
 
 
 
-pub fn read_file(file_name: PathBuf) -> LazyFrame {
-    match which_file(&file_name) {
-        FileType::Csv => read_csv_file(file_name),
-        FileType::Parquet => read_parquet_file(file_name),
-        FileType::Fits => read_fits_file(&file_name).unwrap(),
+pub fn read_file(file_name: PathBuf) -> Result<LazyFrame> {
+    match which_file(&file_name)? {
+        FileType::Csv => Ok(read_csv_file(file_name)),
+        FileType::Parquet => Ok(read_parquet_file(file_name)),
+        FileType::Fits => Ok(read_fits_file(&file_name).unwrap()),
     }
 }

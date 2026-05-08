@@ -8,15 +8,16 @@ use std::path::PathBuf;
 use crate::printer::*;
 use crate::reader::{read_file, which_file, FileType};
 use crate::write::write_parquet;
+use anyhow::Result;
 use clap::ArgMatches;
 use polars::prelude::*;
 
-fn handle_arguments(matches: ArgMatches) {
+fn handle_arguments(matches: ArgMatches) -> Result<()> {
     let file = matches
         .get_one::<String>("file")
         .expect("File argument missing");
     let file_path = PathBuf::from(file);
-    let mut lazy_frame = read_file(file_path.clone());
+    let mut lazy_frame = read_file(file_path.clone())?;
 
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
@@ -41,7 +42,7 @@ fn handle_arguments(matches: ArgMatches) {
     } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
         peak(lazy_frame);
     } else if *matches.get_one::<bool>("convert").unwrap_or(&false) {
-        let outfile = match which_file(&file_path) {
+        let outfile = match which_file(&file_path)? {
             FileType::Csv => PathBuf::from(file.replace(".csv", "_converted.parquet")),
             FileType::Fits => PathBuf::from(file.replace(".fits", "_converted.parquet")),
             FileType::Parquet => panic!("File is already a parquet!"),
@@ -50,9 +51,11 @@ fn handle_arguments(matches: ArgMatches) {
     } else {
         print_only_data(lazy_frame, true);
     }
+    Ok(())
 }
 
-fn main() {
+fn main() -> Result<()> {
     let matches = cli::build_cli().get_matches();
-    handle_arguments(matches);
+    handle_arguments(matches)?;
+    Ok(())
 }
