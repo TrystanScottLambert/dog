@@ -26,21 +26,21 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
     }
 
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
-        print_column_names(&mut lazy_frame);
+        print_column_names(&mut lazy_frame)?;
     } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
-        print_only_data(lazy_frame, false);
+        print_only_data(lazy_frame, false)?;
     } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-        print_tail(lazy_frame);
+        print_tail(lazy_frame)?;
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
-        print_head(&mut lazy_frame);
+        print_head(&mut lazy_frame)?;
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
-        print_schema(lazy_frame);
+        print_schema(lazy_frame)?;
     } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {
-        print_waves_metadata(&file_path);
+        print_waves_metadata(&file_path)?;
     } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
-        print_summary(lazy_frame);
+        print_summary(lazy_frame)?;
     } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
-        peak(lazy_frame);
+        peak(lazy_frame)?;
     } else if *matches.get_one::<bool>("convert").unwrap_or(&false) {
         let outfile = match which_file(&file_path)? {
             FileType::Csv => PathBuf::from(file.replace(".csv", "_converted.parquet")),
@@ -49,7 +49,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         };
         write_parquet(lazy_frame, &outfile).unwrap();
     } else {
-        print_only_data(lazy_frame, true);
+        print_only_data(lazy_frame, true)?;
     }
     Ok(())
 }

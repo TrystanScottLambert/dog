@@ -1,93 +1,88 @@
 // printing module handling all printing functions and routines
-
+use anyhow::{Ok, Result};
 use colored::Colorize;
 use polars::prelude::*;
 use polars::prelude::{Column, CsvWriter};
 use std::fs::File;
 use std::path::PathBuf;
 
-pub fn print_only_data(lazy_frame: LazyFrame, include_header: bool) {
+pub fn print_only_data(lazy_frame: LazyFrame, include_header: bool) -> Result<()> {
     let mut out = std::io::stdout().lock();
-    let mut df = lazy_frame
-        .collect()
-        .expect("Error converting to data frame.");
+    let mut df = lazy_frame.collect()?;
 
     CsvWriter::new(&mut out)
         .include_header(include_header)
         .with_separator(b' ')
-        .finish(&mut df)
-        .expect("Failed to write full CSV to stdout");
+        .finish(&mut df)?;
+    Ok(())
 }
 
-pub fn print_schema(lazy_frame: LazyFrame) {
+pub fn print_schema(lazy_frame: LazyFrame) -> Result<()> {
     let mut mut_lazyframe = lazy_frame;
-    let schema = mut_lazyframe
-        .collect_schema()
-        .expect("Trouble Reading Schema");
-    println!("{:#?}", schema)
+    let schema = mut_lazyframe.collect_schema()?;
+    println!("{:#?}", schema);
+    Ok(())
 }
 
-pub fn print_waves_metadata(file_name: &PathBuf) {
-    let file = File::open(file_name).expect("Problem reading file.");
+pub fn print_waves_metadata(file_name: &PathBuf) -> Result<()> {
+    let file = File::open(file_name)?;
     let mut reader = ParquetReader::new(file);
 
     // Get the file metadata
-    match reader.get_metadata() {
-        Ok(file_metadata) => {
-            if let Some(kv_metadata) = file_metadata.key_value_metadata() {
-                // Look for keyword maml
-                for kv in kv_metadata {
-                    if kv.key == "maml" {
-                        if let Some(value) = &kv.value {
-                            println!("{}", value);
-                            return;
-                        }
-                    }
+    if let Some(kv_metadata) = reader.get_metadata()?.key_value_metadata() {
+        // Look for keyword maml
+        for kv in kv_metadata {
+            if kv.key == "maml" {
+                if let Some(value) = &kv.value {
+                    println!("{}", value);
+                    return Ok(());
                 }
-                println!("No MAML metadata found in file.");
-            } else {
-                println!("No metadata found in file.");
             }
         }
-        Err(e) => println!("Error reading metadata: {}", e),
+    } else {
+        println!("No metadata found in file.");
     }
+    Ok(())
 }
 
-pub fn print_column_names(lazy_frame: &mut LazyFrame) {
+pub fn print_column_names(lazy_frame: &mut LazyFrame) -> Result<()> {
     let col_names: Vec<String> = lazy_frame
-        .collect_schema()
-        .expect("Schema couldn't be resolved")
+        .collect_schema()?
         .iter_names()
         .map(|name| name.to_string())
         .collect();
     println!("{}", col_names.join("\n").green());
+    Ok(())
 }
 
-fn print_catlike(lazy_frame: LazyFrame) {
+fn print_catlike(lazy_frame: LazyFrame) -> Result<()> {
     // prints the data frame on a row x row basis like cat would.
-    let df = lazy_frame.collect().expect("Couldn't convert lf to df.");
+    let df = lazy_frame.collect()?;
     let number_of_rows = df.height();
     let columns = df.columns();
 
     for i in 0..number_of_rows {
         let row_vals: Vec<String> = columns
             .iter()
-            .map(|s| format!("{}", s.get(i).unwrap()))
+            .map(|s| format!("{}", s.get(i).expect("Shouldn't trigger")))
             .collect();
         println!("{}", row_vals.join(" "));
     }
+    Ok(())
 }
 
-pub fn print_tail(lazy_frame: LazyFrame) {
+pub fn print_tail(lazy_frame: LazyFrame) -> Result<()> {
     let tail = lazy_frame.tail(10);
-    print_catlike(tail);
+    print_catlike(tail)?;
+    Ok(())
 }
 
-pub fn print_head(lazy_frame: &mut LazyFrame) {
+pub fn print_head(lazy_frame: &mut LazyFrame) -> Result<()> {
     let head_frame = lazy_frame.clone();
     let head = head_frame.slice(0, 10);
-    print_column_names(lazy_frame);
-    print_catlike(head);
+    print_column_names(lazy_frame)?;
+    print_catlike(head)?;
+    Ok(())
 }
 
 fn create_col_summary_string(column: &Column) -> String {
@@ -113,46 +108,34 @@ fn create_col_summary_string(column: &Column) -> String {
     )
 }
 
-fn get_number_rows(lazy_frame: LazyFrame) -> u32 {
+fn get_number_rows(lazy_frame: LazyFrame) -> Result<u32> {
     // Source - https://stackoverflow.com/a/73534468
     // Posted by Niklas Mohrin, modified by community. See post 'Timeline' for change history
     // Retrieved 2026-05-02, License - CC BY-SA 4.0
-    lazy_frame
+    Ok(lazy_frame
         .select([len().alias("count")])
-        .collect()
-        .unwrap()
-        .column("count")
-        .unwrap()
-        .u32()
-        .unwrap()
+        .collect()?
+        .column("count")?
+        .u32()?
         .get(0)
-        .unwrap()
+        .expect("Dataframe appears to be empty."))
 }
 
-fn get_number_columns(lazy_frame: LazyFrame) -> u32 {
+fn get_number_columns(lazy_frame: LazyFrame) -> Result<u32> {
     let mut mut_lazyframe = lazy_frame;
-    mut_lazyframe.collect_schema().unwrap().len() as u32
+    Ok(mut_lazyframe.collect_schema()?.len() as u32)
 }
 
-pub fn print_summary(lazy_frame: LazyFrame) {
-    let df: DataFrame;
-    let number_of_rows = get_number_rows(lazy_frame.clone());
-    let number_of_columns = get_number_columns(lazy_frame.clone());
-    if number_of_rows < 6 {
-        df = lazy_frame.collect().expect("Can't convert to dataframe");
+pub fn print_summary(lazy_frame: LazyFrame) -> Result<()> {
+    let number_of_rows = get_number_rows(lazy_frame.clone())?;
+    let number_of_columns = get_number_columns(lazy_frame.clone())?;
+    let df = if number_of_rows < 6 {
+        lazy_frame.collect()?
     } else {
-        let df_head = lazy_frame
-            .clone()
-            .slice(0, 3)
-            .collect()
-            .expect("Couldn't convert head ");
-        let df_tail = lazy_frame
-            .clone()
-            .tail(3)
-            .collect()
-            .expect("Couldn't convert");
-        df = df_head.vstack(&df_tail).unwrap();
-    }
+        let df_head = lazy_frame.clone().slice(0, 3).collect()?;
+        let df_tail = lazy_frame.clone().tail(3).collect()?;
+        df_head.vstack(&df_tail)?
+    };
 
     let column_data = df.columns();
 
@@ -169,9 +152,11 @@ pub fn print_summary(lazy_frame: LazyFrame) {
         .map(create_col_summary_string)
         .collect::<Vec<String>>();
     println!("{}", summaries.join("\n"));
+    Ok(())
 }
 
-pub fn peak(lazy_frame: LazyFrame) {
+pub fn peak(lazy_frame: LazyFrame) -> Result<()> {
     // prints out the polars data frame as 'peak'.
-    println!("{:?}", lazy_frame.collect().unwrap())
+    println!("{:?}", lazy_frame.collect()?);
+    Ok(())
 }

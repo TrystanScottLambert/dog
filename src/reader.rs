@@ -25,16 +25,17 @@ pub fn which_file(file_name: &Path) -> Result<FileType> {
     }
 }
 
-pub fn read_parquet_file(file_name: PathBuf)-> LazyFrame {
-    LazyFrame::scan_parquet_files(vec![PlRefPath::new(file_name.to_str().unwrap())].into(), ScanArgsParquet::default()).expect("Couldn't read parquet file.")
+pub fn read_parquet_file(file_name: PathBuf)-> Result<LazyFrame> {
+    Ok(LazyFrame::scan_parquet_files(vec![PlRefPath::new(file_name.to_str().expect("Path {file_name:?} is not utf8"))].into(), ScanArgsParquet::default())?)
 }
 
-pub fn read_csv_file(path: PathBuf) -> LazyFrame {
-    LazyCsvReader::new(PlRefPath::new(path.to_str().unwrap())).finish().expect("Failed parsing csv")
+pub fn read_csv_file(path: PathBuf) -> Result<LazyFrame> {
+    let lf = LazyCsvReader::new(PlRefPath::new(path.to_str().expect("Path {file_name:?} is not utf8"))).finish()?;
+    Ok(lf)
 }
 
 
-pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame, Box<dyn std::error::Error>> {
+pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame> {
     let fptr = FitsFile::open(path)?;
     let hdu = fptr.hdu(1)?;
     let num_cols: i64 = hdu.read_key(&fptr, "TFIELDS")?;
@@ -58,9 +59,6 @@ pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame, Box<dyn std::error::E
                 
                 // Parse the column type to check for vector columns
                 let (repeat_count, type_char) = parse_tform(col_type)?;
-                dbg!(&type_char);
-                dbg!(&repeat_count);
-                dbg!(&col_name);
                 
                 let columns = if repeat_count > 1 && type_char != 'A' {
                     // Vector column - read flat data and reshape
@@ -200,8 +198,8 @@ where
 
 pub fn read_file(file_name: PathBuf) -> Result<LazyFrame> {
     match which_file(&file_name)? {
-        FileType::Csv => Ok(read_csv_file(file_name)),
-        FileType::Parquet => Ok(read_parquet_file(file_name)),
+        FileType::Csv => Ok(read_csv_file(file_name)?),
+        FileType::Parquet => Ok(read_parquet_file(file_name)?),
         FileType::Fits => Ok(read_fits_file(&file_name).unwrap()),
     }
 }
