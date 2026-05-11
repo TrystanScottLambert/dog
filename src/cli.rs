@@ -79,6 +79,12 @@ pub fn build_cli() -> Command {
                 .action(ArgAction::SetTrue),
         )
         .arg(
+            Arg::new("stats")
+                .long("stats")
+                .help("Summary statistics depending on column datatype.")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
             Arg::new("convert")
                 .long("convert")
                 .help("Attempts to convert csv and fits files into a parquet if it can.")

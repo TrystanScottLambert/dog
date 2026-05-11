@@ -160,3 +160,19 @@ pub fn peak(lazy_frame: LazyFrame) -> Result<()> {
     println!("{:?}", lazy_frame.collect()?);
     Ok(())
 }
+
+pub fn print_stats(lazy_frame: LazyFrame) -> Result<()> {
+    let means = lazy_frame
+        .clone()
+        .select([all().as_expr().mean()])
+        .collect()?;
+    let medians = lazy_frame.clone().select([all().as_expr().median()]);
+    let null_counts = lazy_frame.clone().select([all().as_expr().null_count()]);
+    let max_counts = lazy_frame.clone().select([all().as_expr().max()]);
+    let min_counts = lazy_frame.clone().select([all().as_expr().min()]);
+    for name in lazy_frame.clone().collect_schema()?.iter_names() {
+        let col = means.clone();
+        println!("{}: {}", name.bold(), col.column(name.as_str())?.get(0)?);
+    }
+    Ok(())
+}

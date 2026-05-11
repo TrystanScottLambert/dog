@@ -33,6 +33,8 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         print_tail(lazy_frame)?;
     } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
         print_head(&mut lazy_frame)?;
+    } else if *matches.get_one::<bool>("stats").unwrap_or(&false) {
+        print_stats(lazy_frame)?;
     } else if *matches.get_one::<bool>("META").unwrap_or(&false) {
         print_schema(lazy_frame)?;
     } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {
