@@ -1,5 +1,8 @@
 `dog`. It's like cat, but for parquet.
 
+![Demo](.github/dog.gif)
+
+
 # Motivation
 Parquet is a relatively new, open source, file format from Apache which is becoming very popular and is already being adopted extensively within data intensive fields. It is a column-orientated format of storing data and benefits from a large amount of compression ([more information is available at the official apache parquet site](https://parquet.apache.org/)). 
 
