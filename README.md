@@ -21,14 +21,14 @@ The first step is to determine what architecture your system is running. This ca
 For Mac-OS the binaries can be downloaded for newer macs running m-chips (arm64)
 **Installing dog is very easy**
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.0/dog-aarch64-apple-darwin
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.1/dog-aarch64-apple-darwin
 chmod +x dog-aarch64-apple-darwin
 sudo mv dog-aarch64-apple-darwin /usr/local/bin/dog
 ```
 
 For older models then:
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.0/dog-x86_64-apple-darwin
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.1/dog-x86_64-apple-darwin
 chmod +x dog-x86_64-apple-darwin
 sudo mv dog-x86_64-apple-darwin /usr/local/bin/dog
 ```
@@ -39,7 +39,7 @@ should work.
 ### Linux
 Ubuntu/debian flavors of linux should work with:
 ```
-curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.0/dog-x86_64-unknown-linux-gnu
+curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.4.1/dog-x86_64-unknown-linux-gnu
 chmod +x dog-x86_64-unknown-linux-gnu
 sudo mv dog-x86_64-unknown-linux-gnu /usr/local/bin/dog
 ```
@@ -151,10 +151,39 @@ log_mstar_total [10.768383, 10.1552515, ..., 9.557503, 9.438515]
 
 ### Peak
 Another summary view is the `-p --peak` option. This will also give the rows and columns but also include a nicely formated printed out table in polars format.
-```
+```bash
 dog -p test_file.parquet
 ```
 However, more often than not, columns and rows will be emitted except for a couple at the corners.
+
+### Stats
+`dog` can generate basic summary statistics for a subset or all columns. 
+
+```bash
+dog --stats test_file.parquet # stats for all columns
+dog -c ra,dec --stats test_file.parquet #just the stats for these columns
+```
+
+```
+ra:
+---------------
+min: 0.000039
+mean: 187.804214
+median: 191.855545
+max: 359.999969
+std: 121.959641
+null counts: 0
+
+dec:
+---------------
+min: -35.599991
+mean: -18.074331
+median: -28.299042
+max: 3.949996
+std: 15.738805
+null counts: 0
+```
+
 
 ### Schema
 The schema in the metadata of the parquet file can also be printed, but in this case this is only the schema which might be incomplete. 

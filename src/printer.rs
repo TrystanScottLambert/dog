@@ -160,3 +160,59 @@ pub fn peak(lazy_frame: LazyFrame) -> Result<()> {
     println!("{:?}", lazy_frame.collect()?);
     Ok(())
 }
+
+fn print_stat(column_name: &str, stat_name: &str, stat: DataFrame) -> Result<()> {
+    println!(
+        "{}: {}",
+        stat_name,
+        format!("{}", stat.column(column_name)?.get(0)?).green()
+    );
+    Ok(())
+}
+
+pub fn print_stats(lazy_frame: LazyFrame) -> Result<()> {
+    let means = lazy_frame
+        .clone()
+        .select([all().as_expr().mean()])
+        .collect()?;
+    let medians = lazy_frame
+        .clone()
+        .select([all().as_expr().median()])
+        .collect()?;
+
+    let stds = lazy_frame
+        .clone()
+        .select([all().as_expr().std(1)])
+        .collect()?;
+    let null_counts = lazy_frame
+        .clone()
+        .select([all().as_expr().null_count()])
+        .collect()?;
+    let maxes = lazy_frame
+        .clone()
+        .select([all().as_expr().max()])
+        .collect()?;
+    let mins = lazy_frame
+        .clone()
+        .select([all().as_expr().min()])
+        .collect()?;
+    for name in lazy_frame.clone().collect_schema()?.iter_names() {
+        let mean = means.clone();
+        let median = medians.clone();
+        let null_count = null_counts.clone();
+        let max = maxes.clone();
+        let min = mins.clone();
+        let std = stds.clone();
+        println!("{}:", name.bold());
+        println!("---------------");
+        print_stat(name, "min", min)?;
+        print_stat(name, "mean", mean)?;
+        print_stat(name, "median", median)?;
+        print_stat(name, "max", max)?;
+        print_stat(name, "std", std)?;
+        print_stat(name, "null counts", null_count)?;
+
+        println!();
+    }
+    Ok(())
+}
