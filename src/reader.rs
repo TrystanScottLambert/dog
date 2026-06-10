@@ -120,6 +120,20 @@ pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame> {
                             let ca = Int32Chunked::from_vec(col_name.into(), data);
                             ca.into_series().into()
                         }
+                        'L' => {
+                            let data: Vec<String> = local_hdu.read_col(&local_fptr, col_name)?;
+                            let ca: BooleanChunked = data
+                                .iter()
+                                .map(|s| match s.trim() {
+                                    "T" | "t" | "1" | "true"  | "True"  => Some(true),
+                                    "F" | "f" | "0" | "false" | "False" => Some(false),
+                                    "" => None, // FITS logical "undefined" -> null
+                                    _  => None, // or return an Err if you'd rather be strict
+                                })
+                                .collect();
+                            let ca = ca.with_name(col_name.into());
+                            ca.into_series().into()
+                        }
                         _ => {
                             return Err(Box::new(std::io::Error::new(
                                 std::io::ErrorKind::InvalidData,
@@ -138,6 +152,7 @@ pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame> {
     // Flatten the results and collect all columns
     let mut all_columns = Vec::new();
     for result in results {
+        dbg!(&result);
         let cols = result.unwrap();
         all_columns.extend(cols);
     }
