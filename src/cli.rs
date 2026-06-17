@@ -28,6 +28,21 @@ pub fn build_cli() -> Command {
                 .conflicts_with("names"),
         )
         .arg(
+            Arg::new("insert-maml")
+                .long("insert-maml")
+                .help("Inserts MAML metadata from the given .maml file into the parquet file.")
+                .num_args(1)
+                .value_name("MAML_FILE"),
+        )
+        .arg(
+            Arg::new("force")
+                .short('F')
+                .long("force")
+                .help("Overwrite existing MAML metadata if it is already present.")
+                .action(ArgAction::SetTrue)
+                .requires("insert-maml"),
+        )
+        .arg(
             Arg::new("tail")
                 .short('t')
                 .long("tail")
