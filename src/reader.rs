@@ -203,3 +203,10 @@ pub fn read_file(file_name: PathBuf) -> Result<LazyFrame> {
         FileType::Fits => Ok(read_fits_file(&file_name).unwrap()),
     }
 }
+
+pub fn read_yaml(file_name: PathBuf) -> Result<String> {
+    let reader = std::fs::File::open(file_name)?;
+    let thing: String = serde_yaml::from_reader(reader)?;
+    Ok(thing)
+
+}
