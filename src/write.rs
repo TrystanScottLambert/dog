@@ -14,7 +14,7 @@ pub fn write_parquet(lazy_frame: LazyFrame, output_path: &PathBuf) -> Result<()>
 pub fn write_waves_metadata(
     lazy_frame: LazyFrame,
     output_path: &PathBuf,
-    maml: &str,
+    maml: String,
 ) -> Result<()> {
     let lf = lazy_frame.clone();
     let kv = KeyValueMetadata::from_static(vec![("maml".to_string(), maml.to_string())]);

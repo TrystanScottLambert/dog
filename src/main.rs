@@ -6,8 +6,8 @@ mod write;
 use std::path::PathBuf;
 
 use crate::printer::*;
-use crate::reader::{read_file, which_file, FileType};
-use crate::write::write_parquet;
+use crate::reader::{read_file, read_yaml, which_file, FileType};
+use crate::write::{write_parquet, write_waves_metadata};
 use anyhow::Result;
 use clap::ArgMatches;
 use polars::prelude::*;
@@ -50,6 +50,16 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             FileType::Parquet => panic!("File is already a parquet!"),
         };
         write_parquet(lazy_frame, &outfile).unwrap();
+    } else if let Some(maml_file) = matches.get_one::<String>("insert-maml") {
+        let maml = read_yaml(PathBuf::from(maml_file))?;
+        let force = matches.get_flag("force");
+        if !force && check_for_maml_metadata(&file_path)? {
+            anyhow::bail!(
+                "{} already contains MAML metadata; pass -F to overwrite.",
+                file_path.display()
+            );
+        }
+        write_waves_metadata(lazy_frame, &file_path, maml)?;
     } else {
         print_only_data(lazy_frame, true)?;
     }
