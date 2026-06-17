@@ -1,6 +1,6 @@
 // cli manager
 
-use clap::{Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, ArgGroup, Command};
 
 pub fn build_cli() -> Command {
     Command::new("dog")
@@ -47,16 +47,14 @@ pub fn build_cli() -> Command {
                 .short('t')
                 .long("tail")
                 .help("Prints the bottom ten rows of data.")
-                .action(ArgAction::SetTrue)
-                .conflicts_with("head"),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("head")
                 .short('H')
                 .long("head")
                 .help("Prints the top ten rows of data and the column names.")
-                .action(ArgAction::SetTrue)
-                .conflicts_with("tail"),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("schema")
@@ -70,6 +68,7 @@ pub fn build_cli() -> Command {
                 .long("columns")
                 .help("Prints only the selected columns by name.")
                 .num_args(1)
+                .conflicts_with_all(["convert", "insert-maml"])
                 .value_delimiter(','),
         )
         .arg(
@@ -104,5 +103,21 @@ pub fn build_cli() -> Command {
                 .long("convert")
                 .help("Attempts to convert csv and fits files into a parquet if it can.")
                 .action(ArgAction::SetTrue),
+        )
+        .group(
+            ArgGroup::new("mode")
+                .args([
+                    "names",
+                    "data",
+                    "tail",
+                    "head",
+                    "convert",
+                    "insert-maml",
+                    "summary",
+                    "peak",
+                    "stats",
+                    "maml",
+                ])
+                .multiple(false),
         )
 }
