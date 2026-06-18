@@ -117,6 +117,7 @@ pub fn build_cli() -> Command {
                     "peak",
                     "stats",
                     "maml",
+                    "schema",
                 ])
                 .multiple(false),
         )
