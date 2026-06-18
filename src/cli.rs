@@ -68,7 +68,7 @@ pub fn build_cli() -> Command {
                 .long("columns")
                 .help("Prints only the selected columns by name.")
                 .num_args(1)
-                .conflicts_with_all(["convert", "insert-maml"])
+                .conflicts_with_all(["convert", "insert-maml", "schema", "maml"])
                 .value_delimiter(','),
         )
         .arg(
