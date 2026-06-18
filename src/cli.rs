@@ -32,7 +32,7 @@ pub fn build_cli() -> Command {
                 .long("insert-maml")
                 .help("Inserts MAML metadata from the given .maml file into the parquet file.")
                 .num_args(1)
-                .value_name("MAML_FILE"),
+                .value_name("maml_file"),
         )
         .arg(
             Arg::new("force")
