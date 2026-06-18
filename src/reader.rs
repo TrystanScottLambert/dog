@@ -205,8 +205,5 @@ pub fn read_file(file_name: PathBuf) -> Result<LazyFrame> {
 }
 
 pub fn read_yaml(file_name: PathBuf) -> Result<String> {
-    let reader = std::fs::File::open(file_name)?;
-    let thing: String = serde_yaml::from_reader(reader)?;
-    Ok(thing)
-
+    Ok(std::fs::read_to_string(file_name)?)
 }

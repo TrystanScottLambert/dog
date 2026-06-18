@@ -16,12 +16,12 @@ pub fn write_waves_metadata(
     output_path: &PathBuf,
     maml: String,
 ) -> Result<()> {
-    let lf = lazy_frame.clone();
+    let mut df = lazy_frame.clone().collect()?;
     let kv = KeyValueMetadata::from_static(vec![("maml".to_string(), maml.to_string())]);
 
     let file = File::create(output_path)?;
     ParquetWriter::new(file)
         .with_key_value_metadata(Some(kv))
-        .finish(&mut lf.collect()?)?;
+        .finish(&mut df)?;
     Ok(())
 }
