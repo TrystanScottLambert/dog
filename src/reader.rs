@@ -203,3 +203,7 @@ pub fn read_file(file_name: PathBuf) -> Result<LazyFrame> {
         FileType::Fits => Ok(read_fits_file(&file_name).unwrap()),
     }
 }
+
+pub fn read_yaml(file_name: PathBuf) -> Result<String> {
+    Ok(std::fs::read_to_string(file_name)?)
+}

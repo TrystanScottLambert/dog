@@ -1,12 +1,14 @@
 mod cli;
+mod maml_footer;
 mod printer;
 mod reader;
 mod write;
 
 use std::path::PathBuf;
 
+use crate::maml_footer::write_waves_metadata;
 use crate::printer::*;
-use crate::reader::{read_file, which_file, FileType};
+use crate::reader::{read_file, read_yaml, which_file, FileType};
 use crate::write::write_parquet;
 use anyhow::Result;
 use clap::ArgMatches;
@@ -17,6 +19,20 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         .get_one::<String>("file")
         .expect("File argument missing");
     let file_path = PathBuf::from(file);
+
+    if let Some(maml_file) = matches.get_one::<String>("insert-maml") {
+        let maml = read_yaml(PathBuf::from(maml_file))?;
+        let force = matches.get_flag("force");
+        if !force && check_for_maml_metadata(&file_path)? {
+            anyhow::bail!(
+                "{} already contains MAML metadata; pass -F to overwrite; run `dog -w {}` to view.",
+                file_path.display(),
+                file_path.display()
+            );
+        }
+        write_waves_metadata(&file_path, &maml)?;
+        return Ok(());
+    }
     let mut lazy_frame = read_file(file_path.clone())?;
 
     // Optional column filtering BEFORE any printing
