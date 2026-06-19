@@ -168,7 +168,7 @@ pub fn print_summary(lazy_frame: LazyFrame) -> Result<()> {
 
 pub fn peak(lazy_frame: LazyFrame) -> Result<()> {
     // prints out the polars data frame as 'peak'.
-    println!("{:?}", lazy_frame.collect()?);
+    println!("{:?}", lazy_frame.limit(20).with_streaming(true).collect()?);
     Ok(())
 }
 
