@@ -195,7 +195,7 @@ dog --schema test_file.parquet
 ```
 
 ### MAML metadata
-`dog` has specific support for "Meta YAML" or "MAML" (see: https://github.com/asgr/MAML). This is a structured metadata for astronomical surveys like WAVES and 4HS. If this metadata exists then it can be viewed using the -w and --maml flags.
+`dog` has specific support for "Meta YAML" or "MAML" (see: https://github.com/asgr/MAML). This is a structured metadata for astronomical surveys like [WAVES](https://wavesurvey.org/) and [4HS](https://4mosthemispheresurvey.github.io/). If this metadata exists then it can be viewed using the -w and --maml flags.
 
 ```bash
 dog -w test_file.parquet
@@ -205,6 +205,24 @@ This is a useful way to strip MAML metadata from a parquet file
 ```bash
 dog -w test_file.parquet > test.maml
 ```
+
+Users can also insert maml files directly into parquet files. Though consider if this is what you really want to do; usually this step would be done officially at some point and inserting the maml runs the risk of overwriting valid metadata and even corruption.
+
+Say we have a parquet file, "galaxies.parquet" that does not have any maml stored in it and we've built a maml file "galaxies_meta.maml". Then we can insert the "galaxies_meta.maml" contents into the parquet file:
+
+```
+dog --insert-maml galaxies_meta.maml galaxies.parquet
+```
+
+If the file already has a maml entry (like the above example does now) then you can forcefully overwrite it using the `-F` tag:
+
+```
+dog -F --insert-maml different_galaxies_meta.maml galaxies.parquet
+```
+
+Else you will get an error.
+
+
 
 ### Reading non-parquet and converting files
 `dog` is built with parquet in mind, however, it can also read fits tables and csv tables in the exact same way as above. 
