@@ -25,7 +25,8 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         let force = matches.get_flag("force");
         if !force && check_for_maml_metadata(&file_path)? {
             anyhow::bail!(
-                "{} already contains MAML metadata; pass -F to overwrite.",
+                "{} already contains MAML metadata; pass -F to overwrite; run `dog -w {}` to view.",
+                file_path.display(),
                 file_path.display()
             );
         }
