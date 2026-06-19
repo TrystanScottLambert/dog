@@ -34,12 +34,7 @@ const T_STRUCT: u8 = 12;
 const KEY_VALUE_FIELD_ID: i64 = 5; // FileMetaData.key_value_metadata
 
 /// Insert/replace the `maml` key in `output_path`'s footer, in place.
-///
-/// The `-F` / existence handling lives in the caller; this always upserts
-/// (drops any existing `maml`, appends the new value), so calling it with
-/// `force` already decided is correct in every case.
 pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
-    // Open read+write WITHOUT truncating.
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -74,7 +69,6 @@ pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
     let new_blob = upsert_kv(&blob, "maml", maml)?;
 
     // Overwrite only the tail, starting exactly where the old footer began.
-    // All bytes before footer_start (the data + page indexes) are untouched.
     file.seek(SeekFrom::Start(footer_start))?;
     file.write_all(&new_blob)?;
     file.write_all(&(new_blob.len() as u32).to_le_bytes())?;
@@ -87,7 +81,7 @@ pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
 }
 
 /// Walk the top-level `FileMetaData` fields, upsert `key`=`value` into the
-/// key/value metadata list, and return `new_footer_blob`.
+/// key/value metadata list, and return `(new_footer_blob, key_already_existed)`.
 fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
     let mut pos = 0usize;
     let mut last_id = 0i64;
@@ -137,9 +131,11 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
 
 /// Encode a complete `FileMetaData` field 5 from pairs. Uses the long-form
 /// field header (absolute id 5), which keeps neighbouring fields' delta
-/// encoding valid regardless of where this lands.
+/// encoding valid regardless of where this lands. This means we shouldn't
+/// corrupt the delta encoding.
 fn encode_kv_field(pairs: &[(String, Option<String>)]) -> Vec<u8> {
     let mut out = Vec::new();
+    #[allow(clippy::identity_op)] // This (0<<4) has no effect but we're showing intent here.
     out.push((0 << 4) | T_LIST); // delta 0 (long form) + type LIST
     write_uvarint(&mut out, zigzag(KEY_VALUE_FIELD_ID));
     write_collection_header(&mut out, T_STRUCT, pairs.len() as u64);
@@ -183,8 +179,9 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
     ))
 }
 
-// ---- compact-protocol primitives ----
+// following are just the keywords that are used in the thrift protocol. Encoding and decoding.
 
+/// Reads the raw array of bytes into the type_id, field_id, and weather it is a stop command.
 fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(u8, i64, bool)> {
     let b = *buf
         .get(*pos)
@@ -204,6 +201,7 @@ fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(
     Ok((type_id, field_id, false))
 }
 
+// reads the raw array of bytes and converts this into the element type and the number of elements.
 fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(u8, u64)> {
     let header = *buf
         .get(*pos)
@@ -217,6 +215,7 @@ fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(u8, u64)> {
     Ok((elem_type, count))
 }
 
+// converts the element type and the count into bytes and adds them to the `out` bytes array.
 fn write_collection_header(out: &mut Vec<u8>, elem_type: u8, count: u64) {
     if count < 15 {
         out.push(((count as u8) << 4) | elem_type);
@@ -226,6 +225,7 @@ fn write_collection_header(out: &mut Vec<u8>, elem_type: u8, count: u64) {
     }
 }
 
+// Updates the pos cursor by skipping over the different types we don't care about.
 fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
     match type_id {
         T_BOOL_TRUE | T_BOOL_FALSE => {}
@@ -323,10 +323,12 @@ fn write_uvarint(out: &mut Vec<u8>, mut v: u64) {
     }
 }
 
+// convert signed integers into unsigned integers via zigzag encoding
 fn zigzag(v: i64) -> u64 {
     ((v << 1) ^ (v >> 63)) as u64
 }
 
+// convert zigzag encoded unsigned integers to signed integers
 fn unzigzag(v: u64) -> i64 {
     ((v >> 1) as i64) ^ -((v & 1) as i64)
 }

@@ -673,7 +673,6 @@ dependencies = [
  "polars",
  "polars-buffer",
  "rayon",
- "thiserror",
 ]
 
 [[package]]
