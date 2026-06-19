@@ -90,7 +90,7 @@ pub fn print_tail(lazy_frame: LazyFrame) -> Result<()> {
 
 pub fn print_head(lazy_frame: &mut LazyFrame) -> Result<()> {
     let head_frame = lazy_frame.clone();
-    let head = head_frame.slice(0, 10);
+    let head = head_frame.limit(10);
     print_column_names(lazy_frame)?;
     print_catlike(head)?;
     Ok(())
@@ -168,7 +168,7 @@ pub fn print_summary(lazy_frame: LazyFrame) -> Result<()> {
 
 pub fn peak(lazy_frame: LazyFrame) -> Result<()> {
     // prints out the polars data frame as 'peak'.
-    println!("{:?}", lazy_frame.limit(20).with_streaming(true).collect()?);
+    println!("{:?}", lazy_frame.limit(20).collect()?);
     Ok(())
 }
 
