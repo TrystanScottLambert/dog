@@ -332,3 +332,55 @@ fn zigzag(v: i64) -> u64 {
 fn unzigzag(v: u64) -> i64 {
     ((v >> 1) as i64) ^ -((v & 1) as i64)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // tests for zigzag taken from zigzag crate
+    // (https://github.com/Adancurusul/zigzag-rs/blob/master/src/lib.rs)
+    #[test]
+    fn test_zigzag_i64() {
+        assert_eq!(zigzag(0), 0u64);
+        assert_eq!(zigzag(-1), 1u64);
+        assert_eq!(zigzag(1), 2u64);
+        assert_eq!(zigzag(-2), 3u64);
+        assert_eq!(zigzag(2), 4u64);
+    }
+
+    #[test]
+    fn decode_zigzag_i64() {
+        assert_eq!(unzigzag(0u64), 0);
+        assert_eq!(unzigzag(1u64), -1);
+        assert_eq!(unzigzag(2u64), 1);
+        assert_eq!(unzigzag(3u64), -2);
+        assert_eq!(unzigzag(4u64), 2);
+    }
+
+    #[test]
+    fn test_write_uvarint() {
+        // simple 1 = 1 case
+        let mut test_value = Vec::new();
+        let ans = vec![1u8];
+        write_uvarint(&mut test_value, 1u64);
+        assert_eq!(test_value, ans);
+
+        // 60_000 worked example case
+        let mut test_value = Vec::new();
+        let ans = vec![224u8, 212u8, 3u8];
+        write_uvarint(&mut test_value, 60_000u64);
+        assert_eq!(test_value, ans);
+    }
+
+    #[test]
+    fn test_read_uvarint() {
+        // simple 1 = 1 case
+        let mut pos = 1usize;
+        let buffer = vec![2u8, 1u8, 224u8, 212u8, 3u8];
+
+        let res_1 = read_uvarint(&buffer, &mut pos).unwrap();
+        assert_eq!(res_1, 1u64);
+        let res_60k = read_uvarint(&buffer, &mut pos).unwrap();
+        assert_eq!(res_60k, 60_000u64);
+    }
+}
