@@ -138,7 +138,7 @@ pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame> {
     // Flatten the results and collect all columns
     let mut all_columns = Vec::new();
     for result in results {
-        let cols = result.unwrap();
+        let cols = result.map_err(|e| anyhow!("{e}"))?;
         all_columns.extend(cols);
     }
     
@@ -200,7 +200,7 @@ pub fn read_file(file_name: PathBuf) -> Result<LazyFrame> {
     match which_file(&file_name)? {
         FileType::Csv => Ok(read_csv_file(file_name)?),
         FileType::Parquet => Ok(read_parquet_file(file_name)?),
-        FileType::Fits => Ok(read_fits_file(&file_name).unwrap()),
+        FileType::Fits => Ok(read_fits_file(&file_name)?),
     }
 }
 
