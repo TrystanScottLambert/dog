@@ -510,4 +510,15 @@ mod tests {
         skip_value(&buffer, &mut pos, ThriftID::Binary).unwrap();
         assert_eq!(pos, 6); // length byte + 5 bytes of hello
     }
+    #[test]
+    fn test_list() {
+        let header = &[(3 << 4) | ThriftID::I8 as u8]; // sssstttt 3 counts of I8
+        let items = &[1u8, 2u8, 3u8];
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend_from_slice(header);
+        buffer.extend_from_slice(items);
+        let mut pos = 0;
+        skip_value(&buffer, &mut pos, ThriftID::List).unwrap();
+        assert_eq!(pos, 4);
+    }
 }
