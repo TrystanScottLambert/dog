@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn test_binary_skip() {
+    fn test_bool_skip() {
         let mut pos = 2;
         let buffer = [0u8; 12];
         skip_value(&buffer, &mut pos, ThriftID::BoolTrue).unwrap();
@@ -497,5 +497,17 @@ mod tests {
         let mut pos = 0;
         skip_value(&buf, &mut pos, ThriftID::Double).unwrap();
         assert_eq!(pos, 8);
+    }
+
+    #[test]
+    fn test_binary_skip() {
+        let mut buffer: Vec<u8> = Vec::new();
+        let binary_length = &[5u8];
+        let string = b"hello";
+        buffer.extend_from_slice(binary_length);
+        buffer.extend_from_slice(string);
+        let mut pos = 0;
+        skip_value(&buffer, &mut pos, ThriftID::Binary).unwrap();
+        assert_eq!(pos, 6); // length byte + 5 bytes of hello
     }
 }
