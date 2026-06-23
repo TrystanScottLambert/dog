@@ -317,7 +317,7 @@ fn skip_value(buf: &[u8], pos: &mut usize, type_id: ThriftID) -> Result<()> {
             let mut last_id = 0i64; // we are working with deltas so start at zero
             loop {
                 let (type_id, _) = read_field_header(buf, pos, &mut last_id)?;
-                if type_id != ThriftID::Stop {
+                if type_id == ThriftID::Stop {
                     break;
                 }
                 skip_value(buf, pos, type_id)?;
@@ -461,4 +461,17 @@ mod tests {
         let ans = read_binary_str(&buffer, &mut pos);
         assert_eq!(ans.unwrap(), "world!".to_string());
     }
+
+    #[test]
+    fn test_skip_value_binary() {
+        let mut pos = 2;
+        let buffer = [0u8; 12];
+        skip_value(&buffer, &mut pos, ThriftID::BoolTrue).unwrap();
+        assert_eq!(pos, 2);
+        skip_value(&buffer, &mut pos, ThriftID::BoolFalse).unwrap();
+        assert_eq!(pos, 2);
+    }
+
+    #[test]
+    fn test_binary() {}
 }
