@@ -9,29 +9,60 @@
 //!
 //! Limitation: standard, unencrypted footer only (magic `PAR1`).
 
+#![warn(clippy::pedantic)]
 use anyhow::{anyhow, bail, Result};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
 const MAGIC: &[u8; 4] = b"PAR1";
-
-// Thrift compact-protocol type ids.
-const T_STOP: u8 = 0;
-const T_BOOL_TRUE: u8 = 1;
-const T_BOOL_FALSE: u8 = 2;
-const T_I8: u8 = 3;
-const T_I16: u8 = 4;
-const T_I32: u8 = 5;
-const T_I64: u8 = 6;
-const T_DOUBLE: u8 = 7;
-const T_BINARY: u8 = 8;
-const T_LIST: u8 = 9;
-const T_SET: u8 = 10;
-const T_MAP: u8 = 11;
-const T_STRUCT: u8 = 12;
-
 const KEY_VALUE_FIELD_ID: i64 = 5; // FileMetaData.key_value_metadata
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum ThriftID {
+    Stop = 0,
+    BoolTrue = 1,
+    BoolFalse = 2,
+    I8 = 3,
+    I16 = 4,
+    I32 = 5,
+    I64 = 6,
+    Double = 7,
+    Binary = 8,
+    List = 9,
+    Set = 10,
+    Map = 11,
+    Struct = 12,
+}
+
+impl TryFrom<u8> for ThriftID {
+    type Error = anyhow::Error;
+    fn try_from(value: u8) -> Result<Self> {
+        Ok(match value {
+            0 => ThriftID::Stop,
+            1 => ThriftID::BoolTrue,
+            2 => ThriftID::BoolFalse,
+            3 => ThriftID::I8,
+            4 => ThriftID::I16,
+            5 => ThriftID::I32,
+            6 => ThriftID::I64,
+            7 => ThriftID::Double,
+            8 => ThriftID::Binary,
+            9 => ThriftID::List,
+            10 => ThriftID::Set,
+            11 => ThriftID::Map,
+            12 => ThriftID::Struct,
+            _ => bail!("unknown thrift type id {value}"),
+        })
+    }
+}
+
+impl ThriftID {
+    fn byte(self) -> u8 {
+        self as u8
+    }
+}
 
 /// Insert/replace the `maml` key in `output_path`'s footer, in place.
 pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
@@ -51,19 +82,19 @@ pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
     let mut tail = [0u8; 8];
     file.seek(SeekFrom::End(-8))?;
     file.read_exact(&mut tail)?;
-    if tail[4..] != MAGIC[..] {
+    if &tail[4..] != MAGIC {
         bail!(
             "{}: missing PAR1 footer magic (encrypted or non-parquet?)",
             output_path.display()
         );
     }
-    let metadata_len = u32::from_le_bytes(tail[..4].try_into().unwrap()) as u64;
+    let metadata_len = u64::from(u32::from_le_bytes(tail[..4].try_into().unwrap()));
     let footer_start = file_len
         .checked_sub(8 + metadata_len)
         .ok_or_else(|| anyhow!("declared footer length exceeds file size"))?;
 
     // Read only the FileMetaData blob (a few KB), then build the new one.
-    let mut blob = vec![0u8; metadata_len as usize];
+    let mut blob = vec![0u8; usize::try_from(metadata_len)?];
     file.seek(SeekFrom::Start(footer_start))?;
     file.read_exact(&mut blob)?;
     let new_blob = upsert_kv(&blob, "maml", maml)?;
@@ -71,7 +102,7 @@ pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
     // Overwrite only the tail, starting exactly where the old footer began.
     file.seek(SeekFrom::Start(footer_start))?;
     file.write_all(&new_blob)?;
-    file.write_all(&(new_blob.len() as u32).to_le_bytes())?;
+    file.write_all(&(u32::try_from(new_blob.len())?).to_le_bytes())?;
     file.write_all(MAGIC)?;
 
     // The new footer may be shorter or longer than the old one; set exact length.
@@ -90,7 +121,7 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
         let field_start = pos;
         let (type_id, field_id) = read_field_header(blob, &mut pos, &mut last_id)?;
 
-        if type_id == T_STOP {
+        if let ThriftID::Stop = type_id {
             // No field 5: insert a fresh one right before STOP.
             let field = encode_kv_field(&[(key.to_string(), Some(value.to_string()))]);
             let mut out = Vec::with_capacity(blob.len() + field.len());
@@ -101,14 +132,14 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
         }
 
         if field_id == KEY_VALUE_FIELD_ID {
-            if type_id != T_LIST {
-                bail!("key_value_metadata is not a list (thrift type {type_id})");
+            if type_id != ThriftID::List {
+                bail!("key_value_metadata is not a list (thrift type {type_id:?})");
             }
             let (elem_type, count) = read_collection_header(blob, &mut pos)?;
-            if count > 0 && elem_type != T_STRUCT {
+            if count > 0 && elem_type != ThriftID::Struct {
                 bail!("key_value_metadata elements are not structs");
             }
-            let mut pairs = Vec::with_capacity(count as usize + 1);
+            let mut pairs = Vec::with_capacity(usize::try_from(count)? + 1);
             for _ in 0..count {
                 pairs.push(parse_key_value(blob, &mut pos)?);
             }
@@ -135,20 +166,19 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
 /// corrupt the delta encoding.
 fn encode_kv_field(pairs: &[(String, Option<String>)]) -> Vec<u8> {
     let mut out = Vec::new();
-    #[allow(clippy::identity_op)] // This (0<<4) has no effect but we're showing intent here.
-    out.push((0 << 4) | T_LIST); // delta 0 (long form) + type LIST
+    out.push(ThriftID::List.byte()); // delta 0 (long form) + type LIST
     write_uvarint(&mut out, zigzag(KEY_VALUE_FIELD_ID));
-    write_collection_header(&mut out, T_STRUCT, pairs.len() as u64);
+    write_collection_header(&mut out, ThriftID::Struct, pairs.len() as u64);
     for (k, v) in pairs {
-        out.push((1 << 4) | T_BINARY); // field 1: key
+        out.push((1 << 4) | ThriftID::Binary.byte()); // field 1: key
         write_uvarint(&mut out, k.len() as u64);
         out.extend_from_slice(k.as_bytes());
         if let Some(v) = v {
-            out.push((1 << 4) | T_BINARY); // field 2: value
+            out.push((1 << 4) | ThriftID::Binary.byte()); // field 2: value
             write_uvarint(&mut out, v.len() as u64);
             out.extend_from_slice(v.as_bytes());
         }
-        out.push(T_STOP);
+        out.push(ThriftID::Stop.byte());
     }
     out
 }
@@ -159,18 +189,17 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
     let mut value: Option<String> = None;
     loop {
         let (type_id, field_id) = read_field_header(buf, pos, &mut last_id)?;
-        if type_id == T_STOP {
-            break;
-        }
-        if type_id == T_BINARY {
-            let s = read_binary_str(buf, pos)?;
-            match field_id {
-                1 => key = Some(s),
-                2 => value = Some(s),
-                _ => {}
+        match type_id {
+            ThriftID::Stop => break,
+            ThriftID::Binary => {
+                let s = read_binary_str(buf, pos)?;
+                match field_id {
+                    1 => key = Some(s),
+                    2 => value = Some(s),
+                    _ => {}
+                }
             }
-        } else {
-            skip_value(buf, pos, type_id)?;
+            _ => skip_value(buf, pos, type_id)?,
         }
     }
     Ok((
@@ -180,17 +209,17 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
 }
 
 // following are just the keywords that are used in the thrift protocol. Encoding and decoding.
-/// Reads the raw array of bytes into the type_id, field_id, and weather it is a stop command.
-fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(u8, i64)> {
+/// Reads the raw array of bytes into the ``type_id``, ``field_id``, and weather it is a stop command.
+fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(ThriftID, i64)> {
     let buffer = *buf
         .get(*pos)
         .ok_or_else(|| anyhow!("field header out of bounds"))?;
     *pos += 1;
     if buffer == 0 {
-        return Ok((T_STOP, 0));
+        return Ok((ThriftID::Stop, 0));
     }
-    let type_id = buffer & 0x0F;
-    let delta = (buffer >> 4) as i64;
+    let type_id = ThriftID::try_from(buffer & 0x0F)?;
+    let delta = i64::from(buffer >> 4);
     let field_id = if delta == 0 {
         unzigzag(read_uvarint(buf, pos)?) // long form
     } else {
@@ -211,14 +240,14 @@ fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(
 // +--------+--------+...+--------+--------+...+--------+
 // |1111tttt| size                | elements            |
 // +--------+--------+...+--------+--------+...+--------+
-fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(u8, u64)> {
+fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(ThriftID, u64)> {
     let header = *buf // read the header byte
         .get(*pos)
         .ok_or_else(|| anyhow!("collection header out of bounds"))?;
     *pos += 1; // move on to the next byte
-    let elem_type = header & 0x0F; // bit-mask to read the type
-    let mut number_of_elements = (header >> 4) as u64; // but mask to read the ssss part (which could be
-                                                       // 1111 if it is long form)
+    let elem_type = ThriftID::try_from(header & 0x0F)?; // bit-mask to read the type
+    let mut number_of_elements = u64::from(header >> 4); // but mask to read the ssss part (which could be
+                                                         // 1111 if it is long form)
     if number_of_elements == 15 {
         // if number_of_elements = 15 it means that we have 1111tttt as the byte.
         // In which case size "size is the size, an unsigned 32-bit varint, 15 or higher (not ZigZag encoded)."
@@ -229,37 +258,39 @@ fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(u8, u64)> {
 }
 
 // converts the element type and the count into bytes and adds them to the `out` bytes array.
-fn write_collection_header(out: &mut Vec<u8>, elem_type: u8, count: u64) {
+fn write_collection_header(out: &mut Vec<u8>, elem_type: ThriftID, count: u64) {
+    let elem_byte = elem_type.byte();
     if count < 15 {
-        out.push(((count as u8) << 4) | elem_type);
+        #[allow(clippy::cast_possible_truncation)] // truncation is the point here.
+        out.push(((count as u8) << 4) | elem_byte);
     } else {
-        out.push(0xF0 | elem_type);
+        out.push(0xF0 | elem_byte);
         write_uvarint(out, count);
     }
 }
 
 // Updates the pos cursor by skipping over the different types we don't care about.
 // See https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md
-fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
+fn skip_value(buf: &[u8], pos: &mut usize, type_id: ThriftID) -> Result<()> {
     match type_id {
-        T_BOOL_TRUE | T_BOOL_FALSE => {}
+        ThriftID::BoolTrue | ThriftID::BoolFalse => {}
         // "values of i8 are encoded as one byte..."
-        T_I8 => *pos += 1,
+        ThriftID::I8 => *pos += 1,
         // Values of type i16, i32, and i64 are first encoded zigzgag then varint encoded
-        T_I16 | T_I32 | T_I64 => {
+        ThriftID::I16 | ThriftID::I32 | ThriftID::I64 => {
             read_uvarint(buf, pos)?;
         }
         // Values of type double ... in little-endian byte order (8 bytes)
-        T_DOUBLE => *pos += 8,
+        ThriftID::Double => *pos += 8,
         // Binary protocol, binary data, 1+ bytes:
         // +--------+...+--------+--------+...+--------+
         // | byte length         | bytes               |
         // +--------+...+--------+--------+...+--------+
-        T_BINARY => {
-            let len = read_uvarint(buf, pos)? as usize;
+        ThriftID::Binary => {
+            let len = usize::try_from(read_uvarint(buf, pos)?)?;
             *pos += len;
         }
-        T_LIST | T_SET => {
+        ThriftID::List | ThriftID::Set => {
             let (elem_type, count) = read_collection_header(buf, pos)?;
             for _ in 0..count {
                 skip_value(buf, pos, elem_type)?;
@@ -271,7 +302,7 @@ fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
         // +--------+...+--------+--------+--------+...+--------+
         // "size if a 32-bit unsigned size, varint encoded (not ZigZag'ed)"
         // size here actually referes to the *number of pairs* that we still need to walk through
-        T_MAP => {
+        ThriftID::Map => {
             let number_pairs = read_uvarint(buf, pos)?; // this is the number of pairs not size
             if number_pairs > 0 {
                 // kkkkvvvv byte telling us type of key and value which we need to skip in turn.
@@ -282,22 +313,24 @@ fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
                            // bit-masking to get the key type and value type
                 let (kt, vt) = (kv >> 4, kv & 0x0F);
                 for _ in 0..number_pairs {
-                    skip_value(buf, pos, kt)?;
-                    skip_value(buf, pos, vt)?;
+                    skip_value(buf, pos, ThriftID::try_from(kt)?)?;
+                    skip_value(buf, pos, ThriftID::try_from(vt)?)?;
                 }
             }
         } // See the struct encoding
-        T_STRUCT => {
+        ThriftID::Struct => {
             let mut last_id = 0i64; // we are working with deltas so start at zero
             loop {
                 let (type_id, _) = read_field_header(buf, pos, &mut last_id)?;
-                if type_id == T_STOP {
+                if type_id != ThriftID::Stop {
                     break;
                 }
                 skip_value(buf, pos, type_id)?;
             }
         }
-        other => bail!("unknown thrift type id {other}"),
+        ThriftID::Stop => {
+            bail!("Misformed header. STOP found where it shouldn't be. and was not handled.")
+        }
     }
     if *pos > buf.len() {
         bail!("overran footer while parsing");
@@ -306,7 +339,7 @@ fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
 }
 
 fn read_binary_str(buf: &[u8], pos: &mut usize) -> Result<String> {
-    let len = read_uvarint(buf, pos)? as usize;
+    let len = usize::try_from(read_uvarint(buf, pos)?)?;
     let end = pos
         .checked_add(len)
         .ok_or_else(|| anyhow!("binary length overflow"))?;
@@ -326,7 +359,7 @@ fn read_uvarint(buf: &[u8], pos: &mut usize) -> Result<u64> {
             .get(*pos)
             .ok_or_else(|| anyhow!("varint out of bounds"))?;
         *pos += 1;
-        result |= ((byte & 0x7F) as u64) << shift;
+        result |= (u64::from(byte & 0x7F)) << shift;
         if byte & 0x80 == 0 {
             break;
         }
@@ -354,12 +387,12 @@ fn write_uvarint(out: &mut Vec<u8>, mut v: u64) {
 
 // convert signed integers into unsigned integers via zigzag encoding
 fn zigzag(v: i64) -> u64 {
-    ((v << 1) ^ (v >> 63)) as u64
+    ((v << 1) ^ (v >> 63)).cast_unsigned()
 }
 
 // convert zigzag encoded unsigned integers to signed integers
 fn unzigzag(v: u64) -> i64 {
-    ((v >> 1) as i64) ^ -((v & 1) as i64)
+    ((v >> 1).cast_signed()) ^ -((v & 1).cast_signed())
 }
 
 #[cfg(test)]
