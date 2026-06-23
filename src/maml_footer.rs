@@ -473,5 +473,21 @@ mod tests {
     }
 
     #[test]
-    fn test_binary() {}
+    fn test_i8() {
+        let mut pos = 2;
+        let buffer: [u8; 5] = [5, 4, 3, 2, 1];
+        skip_value(&buffer, &mut pos, ThriftID::I8).unwrap();
+        assert_eq!(pos, 3);
+        skip_value(&buffer, &mut pos, ThriftID::I8).unwrap();
+        assert_eq!(pos, 4);
+    }
+
+    #[test]
+    fn test_i16_i32_i64() {
+        // 300 zigzag-or-not is irrelevant to skipping; as a varint it's [0xAC, 0x02]
+        let buf = [0xAC, 0x02, 0xFF];
+        let mut pos = 0;
+        skip_value(&buf, &mut pos, ThriftID::I64).unwrap();
+        assert_eq!(pos, 2);
+    }
 }
