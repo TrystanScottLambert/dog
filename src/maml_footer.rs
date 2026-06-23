@@ -180,7 +180,6 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
 }
 
 // following are just the keywords that are used in the thrift protocol. Encoding and decoding.
-
 /// Reads the raw array of bytes into the type_id, field_id, and weather it is a stop command.
 fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(u8, i64, bool)> {
     let b = *buf
@@ -202,17 +201,31 @@ fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(
 }
 
 // reads the raw array of bytes and converts this into the element type and the number of elements.
+// collection referring to list and sets since they are "encoded the same"
+// Compact protocol list header (1 byte, short form) and elements:
+// +--------+--------+...+--------+
+// |sssstttt| elements            |
+// +--------+--------+...+--------+
+//
+// Compact protocol list header (2+ bytes, long form) and elements:
+// +--------+--------+...+--------+--------+...+--------+
+// |1111tttt| size                | elements            |
+// +--------+--------+...+--------+--------+...+--------+
 fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(u8, u64)> {
-    let header = *buf
+    let header = *buf // read the header byte
         .get(*pos)
         .ok_or_else(|| anyhow!("collection header out of bounds"))?;
-    *pos += 1;
-    let elem_type = header & 0x0F;
-    let mut count = (header >> 4) as u64;
-    if count == 15 {
-        count = read_uvarint(buf, pos)?;
+    *pos += 1; // move on to the next byte
+    let elem_type = header & 0x0F; // bit-mask to read the type
+    let mut number_of_elements = (header >> 4) as u64; // but mask to read the ssss part (which could be
+                                                       // 1111 if it is long form)
+    if number_of_elements == 15 {
+        // if number_of_elements = 15 it means that we have 1111tttt as the byte.
+        // In which case size "size is the size, an unsigned 32-bit varint, 15 or higher (not ZigZag encoded)."
+        number_of_elements = read_uvarint(buf, pos)?;
     }
-    Ok((elem_type, count))
+    // else the size was exactly the number_of_elements (4-bit unsigned values 0 - 14)
+    Ok((elem_type, number_of_elements))
 }
 
 // converts the element type and the count into bytes and adds them to the `out` bytes array.
@@ -226,14 +239,22 @@ fn write_collection_header(out: &mut Vec<u8>, elem_type: u8, count: u64) {
 }
 
 // Updates the pos cursor by skipping over the different types we don't care about.
+// See https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md
 fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
     match type_id {
         T_BOOL_TRUE | T_BOOL_FALSE => {}
+        // "values of i8 are encoded as one byte..."
         T_I8 => *pos += 1,
+        // Values of type i16, i32, and i64 are first encoded zigzgag then varint encoded
         T_I16 | T_I32 | T_I64 => {
             read_uvarint(buf, pos)?;
         }
+        // Values of type double ... in little-endian byte order (8 bytes)
         T_DOUBLE => *pos += 8,
+        // Binary protocol, binary data, 1+ bytes:
+        // +--------+...+--------+--------+...+--------+
+        // | byte length         | bytes               |
+        // +--------+...+--------+--------+...+--------+
         T_BINARY => {
             let len = read_uvarint(buf, pos)? as usize;
             *pos += len;
@@ -244,28 +265,37 @@ fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
                 skip_value(buf, pos, elem_type)?;
             }
         }
+        // "Maps are encoded with a header indicating the size..."
+        // +--------+...+--------+--------+--------+...+--------+
+        // | size                |kkkkvvvv| key value pairs     |
+        // +--------+...+--------+--------+--------+...+--------+
+        // "size if a 32-bit unsigned size, varint encoded (not ZigZag'ed)"
+        // size here actually referes to the *number of pairs* that we still need to walk through
         T_MAP => {
-            let count = read_uvarint(buf, pos)?;
-            if count > 0 {
+            let number_pairs = read_uvarint(buf, pos)?; // this is the number of pairs not size
+            if number_pairs > 0 {
+                // kkkkvvvv byte telling us type of key and value which we need to skip in turn.
                 let kv = *buf
                     .get(*pos)
                     .ok_or_else(|| anyhow!("map header out of bounds"))?;
-                *pos += 1;
+                *pos += 1; // we've read that byte now
+                           // bit-masking to get the key type and value type
                 let (kt, vt) = (kv >> 4, kv & 0x0F);
-                for _ in 0..count {
+                for _ in 0..number_pairs {
                     skip_value(buf, pos, kt)?;
                     skip_value(buf, pos, vt)?;
                 }
             }
         }
+        // See the struct encoding
         T_STRUCT => {
-            let mut last_id = 0i64;
+            let mut last_id = 0i64; // we are working with deltas so start at zero
             loop {
-                let (t, _id, stop) = read_field_header(buf, pos, &mut last_id)?;
+                let (type_id, _, stop) = read_field_header(buf, pos, &mut last_id)?;
                 if stop {
                     break;
                 }
-                skip_value(buf, pos, t)?;
+                skip_value(buf, pos, type_id)?;
             }
         }
         other => bail!("unknown thrift type id {other}"),
