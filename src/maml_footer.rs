@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_value_binary() {
+    fn test_binary_skip() {
         let mut pos = 2;
         let buffer = [0u8; 12];
         skip_value(&buffer, &mut pos, ThriftID::BoolTrue).unwrap();
@@ -473,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn test_i8() {
+    fn test_i8_skip() {
         let mut pos = 2;
         let buffer: [u8; 5] = [5, 4, 3, 2, 1];
         skip_value(&buffer, &mut pos, ThriftID::I8).unwrap();
@@ -483,11 +483,19 @@ mod tests {
     }
 
     #[test]
-    fn test_i16_i32_i64() {
+    fn test_i16_i32_i64_skip() {
         // 300 zigzag-or-not is irrelevant to skipping; as a varint it's [0xAC, 0x02]
         let buf = [0xAC, 0x02, 0xFF];
         let mut pos = 0;
         skip_value(&buf, &mut pos, ThriftID::I64).unwrap();
         assert_eq!(pos, 2);
+    }
+
+    #[test]
+    fn test_double_skip() {
+        let buf = [0u8; 9]; // 8 value bytes + sentinel
+        let mut pos = 0;
+        skip_value(&buf, &mut pos, ThriftID::Double).unwrap();
+        assert_eq!(pos, 8);
     }
 }
