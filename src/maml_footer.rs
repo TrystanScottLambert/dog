@@ -93,7 +93,6 @@ pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
         .checked_sub(8 + metadata_len)
         .ok_or_else(|| anyhow!("declared footer length exceeds file size"))?;
 
-    // Read only the FileMetaData blob (a few KB), then build the new one.
     let mut blob = vec![0u8; usize::try_from(metadata_len)?];
     file.seek(SeekFrom::Start(footer_start))?;
     file.read_exact(&mut blob)?;
@@ -329,7 +328,9 @@ fn skip_value(buf: &[u8], pos: &mut usize, type_id: ThriftID) -> Result<()> {
             }
         }
         ThriftID::Stop => {
-            bail!("Misformed header. STOP found where it shouldn't be. and was not handled.")
+            bail!(
+                "Misformed header. STOP found where it shouldn't be and was not handled correctly."
+            )
         }
     }
     if *pos > buf.len() {
