@@ -58,12 +58,6 @@ impl TryFrom<u8> for ThriftID {
     }
 }
 
-impl ThriftID {
-    fn byte(self) -> u8 {
-        self as u8
-    }
-}
-
 /// Insert/replace the `maml` key in `output_path`'s footer, in place.
 pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
     let mut file = OpenOptions::new()
@@ -165,19 +159,19 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
 /// corrupt the delta encoding.
 fn encode_kv_field(pairs: &[(String, Option<String>)]) -> Vec<u8> {
     let mut out = Vec::new();
-    out.push(ThriftID::List.byte()); // delta 0 (long form) + type LIST
+    out.push(ThriftID::List as u8); // delta 0 (long form) + type LIST
     write_uvarint(&mut out, zigzag(KEY_VALUE_FIELD_ID));
     write_collection_header(&mut out, ThriftID::Struct, pairs.len() as u64);
     for (k, v) in pairs {
-        out.push((1 << 4) | ThriftID::Binary.byte()); // field 1: key
+        out.push((1 << 4) | ThriftID::Binary as u8); // field 1: key
         write_uvarint(&mut out, k.len() as u64);
         out.extend_from_slice(k.as_bytes());
         if let Some(v) = v {
-            out.push((1 << 4) | ThriftID::Binary.byte()); // field 2: value
+            out.push((1 << 4) | ThriftID::Binary as u8); // field 2: value
             write_uvarint(&mut out, v.len() as u64);
             out.extend_from_slice(v.as_bytes());
         }
-        out.push(ThriftID::Stop.byte());
+        out.push(ThriftID::Stop as u8);
     }
     out
 }
@@ -258,7 +252,7 @@ fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(ThriftID, u64)
 
 // converts the element type and the count into bytes and adds them to the `out` bytes array.
 fn write_collection_header(out: &mut Vec<u8>, elem_type: ThriftID, count: u64) {
-    let elem_byte = elem_type.byte();
+    let elem_byte = elem_type as u8;
     if count < 15 {
         #[allow(clippy::cast_possible_truncation)] // truncation is the point here.
         out.push(((count as u8) << 4) | elem_byte);
