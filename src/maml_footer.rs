@@ -88,9 +88,9 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
 
     loop {
         let field_start = pos;
-        let (type_id, field_id, is_stop) = read_field_header(blob, &mut pos, &mut last_id)?;
+        let (type_id, field_id) = read_field_header(blob, &mut pos, &mut last_id)?;
 
-        if is_stop {
+        if type_id == T_STOP {
             // No field 5: insert a fresh one right before STOP.
             let field = encode_kv_field(&[(key.to_string(), Some(value.to_string()))]);
             let mut out = Vec::with_capacity(blob.len() + field.len());
@@ -158,8 +158,8 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
     let mut key: Option<String> = None;
     let mut value: Option<String> = None;
     loop {
-        let (type_id, field_id, is_stop) = read_field_header(buf, pos, &mut last_id)?;
-        if is_stop {
+        let (type_id, field_id) = read_field_header(buf, pos, &mut last_id)?;
+        if type_id == T_STOP {
             break;
         }
         if type_id == T_BINARY {
@@ -181,23 +181,23 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
 
 // following are just the keywords that are used in the thrift protocol. Encoding and decoding.
 /// Reads the raw array of bytes into the type_id, field_id, and weather it is a stop command.
-fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(u8, i64, bool)> {
-    let b = *buf
+fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(u8, i64)> {
+    let buffer = *buf
         .get(*pos)
         .ok_or_else(|| anyhow!("field header out of bounds"))?;
     *pos += 1;
-    if b == 0 {
-        return Ok((T_STOP, 0, true));
+    if buffer == 0 {
+        return Ok((T_STOP, 0));
     }
-    let type_id = b & 0x0F;
-    let delta = (b >> 4) as i64;
+    let type_id = buffer & 0x0F;
+    let delta = (buffer >> 4) as i64;
     let field_id = if delta == 0 {
         unzigzag(read_uvarint(buf, pos)?) // long form
     } else {
         *last_id + delta
     };
     *last_id = field_id;
-    Ok((type_id, field_id, false))
+    Ok((type_id, field_id))
 }
 
 // reads the raw array of bytes and converts this into the element type and the number of elements.
@@ -286,13 +286,12 @@ fn skip_value(buf: &[u8], pos: &mut usize, type_id: u8) -> Result<()> {
                     skip_value(buf, pos, vt)?;
                 }
             }
-        }
-        // See the struct encoding
+        } // See the struct encoding
         T_STRUCT => {
             let mut last_id = 0i64; // we are working with deltas so start at zero
             loop {
-                let (type_id, _, stop) = read_field_header(buf, pos, &mut last_id)?;
-                if stop {
+                let (type_id, _) = read_field_header(buf, pos, &mut last_id)?;
+                if type_id == T_STOP {
                     break;
                 }
                 skip_value(buf, pos, type_id)?;
