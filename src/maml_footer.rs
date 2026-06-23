@@ -395,6 +395,9 @@ fn unzigzag(v: u64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn fhead(delta: u8, t: ThriftID) -> u8 {
+        (delta << 4) | t as u8
+    }
 
     // tests for zigzag taken from zigzag crate
     // (https://github.com/Adancurusul/zigzag-rs/blob/master/src/lib.rs)
@@ -510,8 +513,9 @@ mod tests {
         skip_value(&buffer, &mut pos, ThriftID::Binary).unwrap();
         assert_eq!(pos, 6); // length byte + 5 bytes of hello
     }
+
     #[test]
-    fn test_list() {
+    fn test_list_i8_skip() {
         let header = &[(3 << 4) | ThriftID::I8 as u8]; // sssstttt 3 counts of I8
         let items = &[1u8, 2u8, 3u8];
         let mut buffer: Vec<u8> = Vec::new();
@@ -520,5 +524,64 @@ mod tests {
         let mut pos = 0;
         skip_value(&buffer, &mut pos, ThriftID::List).unwrap();
         assert_eq!(pos, 4);
+    }
+    #[test]
+    fn test_empty_map_skip() {
+        let buf = [0x00, 0xFF]; // count 0, no kv-type byte follows
+        let mut pos = 0;
+        skip_value(&buf, &mut pos, ThriftID::Map).unwrap();
+        assert_eq!(pos, 1);
+    }
+
+    #[test]
+    fn test_map_one_i8_to_i8_skip() {
+        let kv = ((ThriftID::I8 as u8) << 4) | ThriftID::I8 as u8;
+        let buf = [0x01, kv, 0xAA, 0xBB, 0xFF]; // count, kv-types, key, value
+        let mut pos = 0;
+        skip_value(&buf, &mut pos, ThriftID::Map).unwrap();
+        assert_eq!(pos, 4);
+    }
+
+    #[test]
+    fn test_struct_skip() {
+        // field id 1, type I8, value 0x42, then STOP
+        let buf = [fhead(1, ThriftID::I8), 0x42, ThriftID::Stop as u8, 0xFF];
+        let mut pos = 0;
+        skip_value(&buf, &mut pos, ThriftID::Struct).unwrap();
+        assert_eq!(pos, 3); // header + value + stop  -- FAILS on the inverted arm
+    }
+
+    #[test]
+    fn test_empty_struct_skip() {
+        let buf = [ThriftID::Stop as u8, 0xFF];
+        let mut pos = 0;
+        skip_value(&buf, &mut pos, ThriftID::Struct).unwrap();
+        assert_eq!(pos, 1); // -- the inverted arm bails here instead
+    }
+
+    #[test]
+    fn test_nested_list_of_structs_skip() {
+        // exercises recursion: list of 2 structs, each = one I8 field then STOP
+        let one = [fhead(1, ThriftID::I8), 0x09, ThriftID::Stop as u8];
+        let mut buf = vec![(2 << 4) | ThriftID::Struct as u8];
+        buf.extend_from_slice(&one);
+        buf.extend_from_slice(&one);
+        buf.push(0xFF);
+        let mut pos = 0;
+        skip_value(&buf, &mut pos, ThriftID::List).unwrap();
+        assert_eq!(pos, 1 + 3 + 3);
+    }
+
+    #[test]
+    fn test_stop_errors_skip() {
+        let mut pos = 0;
+        assert!(skip_value(&[0x00], &mut pos, ThriftID::Stop).is_err());
+    }
+
+    #[test]
+    fn test_truncated_binary_errors_skips() {
+        // claims length 16 but the bytes aren't there
+        let mut pos = 0;
+        assert!(skip_value(&[0x10], &mut pos, ThriftID::Binary).is_err());
     }
 }
