@@ -383,4 +383,23 @@ mod tests {
         let res_60k = read_uvarint(&buffer, &mut pos).unwrap();
         assert_eq!(res_60k, 60_000u64);
     }
+
+    #[test]
+    fn test_read_binary_string() {
+        let mut pos = 0usize;
+        let length_1 = &[5u8];
+        let length_2 = &[6u8];
+        let string_1 = b"hello";
+        let string_2 = b"world!";
+        let mut buffer = Vec::new();
+        buffer.extend_from_slice(length_1);
+        buffer.extend_from_slice(string_1);
+        buffer.extend_from_slice(length_2);
+        buffer.extend_from_slice(string_2);
+
+        let ans = read_binary_str(&buffer, &mut pos);
+        assert_eq!(ans.unwrap(), "hello".to_string());
+        let ans = read_binary_str(&buffer, &mut pos);
+        assert_eq!(ans.unwrap(), "world!".to_string());
+    }
 }
