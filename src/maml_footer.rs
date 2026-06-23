@@ -53,7 +53,7 @@ impl TryFrom<u8> for ThriftID {
             10 => ThriftID::Set,
             11 => ThriftID::Map,
             12 => ThriftID::Struct,
-            _ => bail!("unknown thrift type id {value}"),
+            _ => bail!("unsupported thrift type id {value}"),
         })
     }
 }
