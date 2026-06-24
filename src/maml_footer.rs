@@ -606,4 +606,21 @@ mod tests {
         let answer = vec![answer_header, 224u8, 212u8, 3u8];
         assert_eq!(buffer, answer);
     }
+
+    #[test]
+    fn test_read_collection_header() {
+        // taking the worked example from write collection headers
+        let count = 10;
+        let mut pos = 0;
+        let short_form_header =
+            vec![(u8::try_from(count).unwrap() << 4) | (ThriftID::Binary as u8)];
+        let long_form_header = vec![0xF0 | (ThriftID::Binary as u8), 224u8, 212u8, 3u8];
+        let (answer_id, count) = read_collection_header(&short_form_header, &mut pos).unwrap();
+        assert_eq!(answer_id, ThriftID::Binary);
+        assert_eq!(count, 10);
+        let mut pos = 0;
+        let (answer_id, count) = read_collection_header(&long_form_header, &mut pos).unwrap();
+        assert_eq!(answer_id, ThriftID::Binary);
+        assert_eq!(count, 60_000);
+    }
 }
