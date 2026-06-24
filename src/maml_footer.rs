@@ -175,7 +175,13 @@ fn encode_kv_field(pairs: &[(String, Option<String>)]) -> Vec<u8> {
     }
     out
 }
-
+// Spec here is in https://github.com/apache/parquet-format/blob/master/src/main/thrift/parquet.thrift
+//  * Wrapper struct to store key values
+//  */
+//  struct KeyValue {
+//   1: required string key
+//   2: optional string value
+// }
 fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String>)> {
     let mut last_id = 0i64;
     let mut key: Option<String> = None;
@@ -189,7 +195,7 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
                 match field_id {
                     1 => key = Some(s),
                     2 => value = Some(s),
-                    _ => {}
+                    _ => {} // "... it is also possible to handle unknown fields while decoding by ignoring them..."
                 }
             }
             _ => skip_value(buf, pos, type_id)?,
@@ -693,5 +699,76 @@ mod tests {
         let (res_id, res_64) = read_field_header(&stop_buffer, &mut pos, &mut last_id).unwrap();
         assert_eq!(res_id, ThriftID::Stop);
         assert_eq!(res_64, 0);
+    }
+
+    #[test]
+    fn test_parse_key_value_simple() {
+        let mut key_value = Vec::new();
+        let mut pos = 0;
+        let field_id = (0x01 << 4) | ThriftID::Binary as u8;
+        // field 1 (key)
+        key_value.extend_from_slice(&[field_id]);
+        key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
+        key_value.extend_from_slice(b"key");
+
+        // field 2 (value)
+        key_value.extend_from_slice(&[field_id]);
+        key_value.extend_from_slice(&[u8::try_from(5).unwrap()]);
+        key_value.extend_from_slice(b"value");
+
+        // stop
+        key_value.extend_from_slice(&[0u8]);
+
+        let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
+        assert_eq!(res_key, "key".to_string());
+        assert!(res_value.is_some());
+        assert_eq!(res_value.unwrap(), "value".to_string());
+    }
+
+    #[test]
+    fn test_parse_key_value_missing_value() {
+        let mut key_value = Vec::new();
+        let mut pos = 0;
+        let field_id = (0x01 << 4) | ThriftID::Binary as u8;
+        // field 1 (key)
+        key_value.extend_from_slice(&[field_id]);
+        key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
+        key_value.extend_from_slice(b"key");
+
+        // stop
+        key_value.extend_from_slice(&[0u8]);
+
+        let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
+        assert_eq!(res_key, "key".to_string());
+        assert!(res_value.is_none());
+    }
+    #[test]
+    fn test_parse_key_value_extra_field_ignored() {
+        let mut key_value = Vec::new();
+        let mut pos = 0;
+        let field_id = (0x01 << 4) | ThriftID::Binary as u8;
+
+        // field 1 (key)
+        key_value.extend_from_slice(&[field_id]);
+        key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
+        key_value.extend_from_slice(b"key");
+
+        // field 2 (value)
+        key_value.extend_from_slice(&[field_id]);
+        key_value.extend_from_slice(&[u8::try_from(5).unwrap()]);
+        key_value.extend_from_slice(b"value");
+
+        // field 3
+        key_value.extend_from_slice(&[field_id]);
+        key_value.extend_from_slice(&[u8::try_from(6).unwrap()]);
+        key_value.extend_from_slice(b"ignore");
+
+        // stop
+        key_value.extend_from_slice(&[0u8]);
+
+        let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
+        assert_eq!(res_key, "key".to_string());
+        assert!(res_value.is_some());
+        assert_eq!(res_value.unwrap(), "value".to_string());
     }
 }
