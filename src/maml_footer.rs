@@ -251,8 +251,10 @@ fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(ThriftID, u64)
 }
 
 // converts the element type and the count into bytes and adds them to the `out` bytes array.
-fn write_collection_header(out: &mut Vec<u8>, elem_type: ThriftID, count: u64) {
-    let elem_byte = elem_type as u8;
+// Collection headers are referring to lists and sets.
+//
+fn write_collection_header(out: &mut Vec<u8>, element_type: ThriftID, count: u64) {
+    let elem_byte = element_type as u8;
     if count < 15 {
         out.push(
             ((u8::try_from(count).expect("Should not be possible, less than 15")) << 4) | elem_byte,
@@ -393,6 +395,7 @@ fn unzigzag(v: u64) -> i64 {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     fn fhead(delta: u8, t: ThriftID) -> u8 {
         (delta << 4) | t as u8
@@ -441,6 +444,7 @@ mod tests {
 
         let res_1 = read_uvarint(&buffer, &mut pos).unwrap();
         assert_eq!(res_1, 1u64);
+        // 60k test
         let res_60k = read_uvarint(&buffer, &mut pos).unwrap();
         assert_eq!(res_60k, 60_000u64);
     }
@@ -582,5 +586,24 @@ mod tests {
         // claims length 16 but the bytes aren't there
         let mut pos = 0;
         assert!(skip_value(&[0x10], &mut pos, ThriftID::Binary).is_err());
+    }
+    #[test]
+    fn test_write_collection_header_small_count() {
+        let mut buffer = Vec::new();
+        let element_type = ThriftID::Binary;
+        let count = 10;
+        write_collection_header(&mut buffer, element_type, count);
+        let answer = (u8::try_from(count).unwrap() << 4) | (ThriftID::Binary as u8);
+        assert_eq!(buffer, vec![answer]);
+    }
+    #[test]
+    fn test_write_collection_header_big_count() {
+        let mut buffer = Vec::new();
+        let element_type = ThriftID::Binary;
+        let count = 60_000;
+        write_collection_header(&mut buffer, element_type, count);
+        let answer_header = 0xF0 | (ThriftID::Binary as u8);
+        let answer = vec![answer_header, 224u8, 212u8, 3u8];
+        assert_eq!(buffer, answer);
     }
 }
