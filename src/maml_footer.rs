@@ -254,7 +254,6 @@ fn read_collection_header(buf: &[u8], pos: &mut usize) -> Result<(ThriftID, u64)
 fn write_collection_header(out: &mut Vec<u8>, elem_type: ThriftID, count: u64) {
     let elem_byte = elem_type as u8;
     if count < 15 {
-        // #[allow(clippy::cast_possible_truncation)] // truncation is the point here.
         out.push(
             ((u8::try_from(count).expect("Should not be possible, less than 15")) << 4) | elem_byte,
         );
