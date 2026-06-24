@@ -771,4 +771,41 @@ mod tests {
         assert!(res_value.is_some());
         assert_eq!(res_value.unwrap(), "value".to_string());
     }
+
+    #[test]
+    fn test_encode_kv() {
+        let kvs = [
+            ("key_1".to_string(), Some("value_1".to_string())),
+            ("key_2".to_string(), Some("value_2".to_string())),
+            ("key_3".to_string(), None),
+        ];
+        let struct_header = (1u8 << 4) | ThriftID::Binary as u8;
+        let result = encode_kv_field(&kvs);
+
+        let mut answer = Vec::new();
+        answer.extend_from_slice(&[ThriftID::List as u8]);
+        answer.extend_from_slice(&[u8::try_from(zigzag(5)).unwrap()]); // field id of kv metadata
+        answer.extend_from_slice(&[(3 << 4) | ThriftID::Struct as u8]); // elements and type
+        answer.extend_from_slice(&[struct_header]);
+        answer.extend_from_slice(&[5u8]);
+        answer.extend_from_slice(b"key_1");
+        answer.extend_from_slice(&[struct_header]);
+        answer.extend_from_slice(&[7u8]);
+        answer.extend_from_slice(b"value_1");
+        answer.extend_from_slice(&[0u8]);
+
+        answer.extend_from_slice(&[struct_header]);
+        answer.extend_from_slice(&[5u8]);
+        answer.extend_from_slice(b"key_2");
+        answer.extend_from_slice(&[struct_header]);
+        answer.extend_from_slice(&[7u8]);
+        answer.extend_from_slice(b"value_2");
+        answer.extend_from_slice(&[0u8]);
+
+        answer.extend_from_slice(&[struct_header]);
+        answer.extend_from_slice(&[5u8]);
+        answer.extend_from_slice(b"key_3");
+        answer.extend_from_slice(&[0u8]);
+        assert_eq!(result, answer);
+    }
 }
