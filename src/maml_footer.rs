@@ -202,12 +202,27 @@ fn parse_key_value(buf: &[u8], pos: &mut usize) -> Result<(String, Option<String
 }
 
 // following are just the keywords that are used in the thrift protocol. Encoding and decoding.
-/// Reads the raw array of bytes into the ``type_id``, ``field_id``, and weather it is a stop command.
+// Reads the raw array of bytes into the ``type_id``, ``field_id``, and weather it is a stop command.
+// Field ID here is just counting the entries 1, 2, 3 etc. but using the deltas
+// Compact protocol field header (short form) and field value:
+// +--------+--------+...+--------+
+// |ddddtttt| field value         |
+// +--------+--------+...+--------+
+//
+// Compact protocol field header (1 to 3 bytes, long form) and field value:
+// +--------+--------+...+--------+--------+...+--------+
+// |0000tttt| field id            | field value         |
+// +--------+--------+...+--------+--------+...+--------+
+//
+// Compact protocol stop-field:
+// +--------+
+// |00000000|
+// +--------+
 fn read_field_header(buf: &[u8], pos: &mut usize, last_id: &mut i64) -> Result<(ThriftID, i64)> {
     let buffer = *buf
         .get(*pos)
-        .ok_or_else(|| anyhow!("field header out of bounds"))?;
-    *pos += 1;
+        .ok_or_else(|| anyhow!("field header out of bounds"))?; // read the first byte
+    *pos += 1; // move pointer to next byte
     if buffer == 0 {
         return Ok((ThriftID::Stop, 0));
     }
@@ -622,5 +637,61 @@ mod tests {
         let (answer_id, count) = read_collection_header(&long_form_header, &mut pos).unwrap();
         assert_eq!(answer_id, ThriftID::Binary);
         assert_eq!(count, 60_000);
+    }
+
+    #[test]
+    fn test_read_field_header() {
+        let mut last_id = 0;
+        let mut pos = 0;
+        let string_length = 3u8;
+        let string_value = b"dog";
+        let short_form_header = (0x01 << 4) | (ThriftID::Binary as u8);
+        let mut short_1_buffer = Vec::new();
+        // first field 1 is a string called "dog"
+        short_1_buffer.extend_from_slice(&[short_form_header]);
+        short_1_buffer.extend_from_slice(&[string_length]);
+        short_1_buffer.extend_from_slice(string_value);
+
+        // field 2 is a string called "dogs"
+        let mut short_2_buffer = Vec::new();
+        short_2_buffer.extend_from_slice(&[short_form_header]);
+        short_2_buffer.extend_from_slice(&[4]);
+        short_2_buffer.extend_from_slice(b"dogs");
+
+        // field 4 is a longform id with a int64 value of 123
+        let mut long_buffer = Vec::new();
+        let long_form_header = [ThriftID::I64 as u8, u8::try_from(zigzag(4)).unwrap()];
+        let mut long_form_value = Vec::new();
+        write_uvarint(&mut long_form_value, zigzag(64));
+        long_buffer.extend_from_slice(&long_form_header);
+        long_buffer.extend_from_slice(&long_form_value);
+
+        // Stop field at the end
+        let mut stop_buffer = Vec::new();
+        stop_buffer.extend_from_slice(&[0u8]);
+
+        let (res_id, res_64) = read_field_header(&short_1_buffer, &mut pos, &mut last_id).unwrap();
+        assert_eq!(res_id, ThriftID::Binary);
+        assert_eq!(res_64, 1);
+        assert_eq!(pos, 1); // just read the header. The full update is handled with skip
+
+        pos = 0;
+        last_id = 1;
+        let (res_id, res_64) = read_field_header(&short_2_buffer, &mut pos, &mut last_id).unwrap();
+        assert_eq!(res_id, ThriftID::Binary);
+        assert_eq!(res_64, 2);
+        assert_eq!(pos, 1);
+
+        pos = 0;
+        last_id = 5;
+        let (res_id, res_64) = read_field_header(&long_buffer, &mut pos, &mut last_id).unwrap();
+        assert_eq!(res_id, ThriftID::I64);
+        assert_eq!(res_64, 4);
+
+        pos = 0;
+        last_id = 5;
+        let (res_id, res_64) = read_field_header(&stop_buffer, &mut pos, &mut last_id).unwrap();
+        assert_eq!(res_id, ThriftID::Stop);
+        assert_eq!(res_64, 0);
     }
 }
