@@ -417,59 +417,7 @@ fn unzigzag(v: u64) -> i64 {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-    fn fhead(delta: u8, t: ThriftID) -> u8 {
-        (delta << 4) | t as u8
-    }
-
-    // tests for zigzag taken from zigzag crate
-    // (https://github.com/Adancurusul/zigzag-rs/blob/master/src/lib.rs)
-    #[test]
-    fn test_zigzag_i64() {
-        assert_eq!(zigzag(0), 0u64);
-        assert_eq!(zigzag(-1), 1u64);
-        assert_eq!(zigzag(1), 2u64);
-        assert_eq!(zigzag(-2), 3u64);
-        assert_eq!(zigzag(2), 4u64);
-    }
-
-    #[test]
-    fn decode_zigzag_i64() {
-        assert_eq!(unzigzag(0u64), 0);
-        assert_eq!(unzigzag(1u64), -1);
-        assert_eq!(unzigzag(2u64), 1);
-        assert_eq!(unzigzag(3u64), -2);
-        assert_eq!(unzigzag(4u64), 2);
-    }
-
-    #[test]
-    fn test_write_uvarint() {
-        // simple 1 = 1 case
-        let mut test_value = Vec::new();
-        let ans = vec![1u8];
-        write_uvarint(&mut test_value, 1u64);
-        assert_eq!(test_value, ans);
-
-        // 60_000 worked example case
-        let mut test_value = Vec::new();
-        let ans = vec![224u8, 212u8, 3u8];
-        write_uvarint(&mut test_value, 60_000u64);
-        assert_eq!(test_value, ans);
-    }
-
-    #[test]
-    fn test_read_uvarint() {
-        // simple 1 = 1 case
-        let mut pos = 1usize;
-        let buffer = vec![2u8, 1u8, 224u8, 212u8, 3u8];
-
-        let res_1 = read_uvarint(&buffer, &mut pos).unwrap();
-        assert_eq!(res_1, 1u64);
-        // 60k test
-        let res_60k = read_uvarint(&buffer, &mut pos).unwrap();
-        assert_eq!(res_60k, 60_000u64);
-    }
 
     #[test]
     fn test_read_binary_string() {
@@ -490,125 +438,6 @@ mod tests {
         assert_eq!(ans.unwrap(), "world!".to_string());
     }
 
-    #[test]
-    fn test_bool_skip() {
-        let mut pos = 2;
-        let buffer = [0u8; 12];
-        skip_value(&buffer, &mut pos, ThriftID::BoolTrue).unwrap();
-        assert_eq!(pos, 2);
-        skip_value(&buffer, &mut pos, ThriftID::BoolFalse).unwrap();
-        assert_eq!(pos, 2);
-    }
-
-    #[test]
-    fn test_i8_skip() {
-        let mut pos = 2;
-        let buffer: [u8; 5] = [5, 4, 3, 2, 1];
-        skip_value(&buffer, &mut pos, ThriftID::I8).unwrap();
-        assert_eq!(pos, 3);
-        skip_value(&buffer, &mut pos, ThriftID::I8).unwrap();
-        assert_eq!(pos, 4);
-    }
-
-    #[test]
-    fn test_i16_i32_i64_skip() {
-        // 300 zigzag-or-not is irrelevant to skipping; as a varint it's [0xAC, 0x02]
-        let buf = [0xAC, 0x02, 0xFF];
-        let mut pos = 0;
-        skip_value(&buf, &mut pos, ThriftID::I64).unwrap();
-        assert_eq!(pos, 2);
-    }
-
-    #[test]
-    fn test_double_skip() {
-        let buf = [0u8; 9]; // 8 value bytes + sentinel
-        let mut pos = 0;
-        skip_value(&buf, &mut pos, ThriftID::Double).unwrap();
-        assert_eq!(pos, 8);
-    }
-
-    #[test]
-    fn test_binary_skip() {
-        let mut buffer: Vec<u8> = Vec::new();
-        let binary_length = &[5u8];
-        let string = b"hello";
-        buffer.extend_from_slice(binary_length);
-        buffer.extend_from_slice(string);
-        let mut pos = 0;
-        skip_value(&buffer, &mut pos, ThriftID::Binary).unwrap();
-        assert_eq!(pos, 6); // length byte + 5 bytes of hello
-    }
-
-    #[test]
-    fn test_list_i8_skip() {
-        let header = &[(3 << 4) | ThriftID::I8 as u8]; // sssstttt 3 counts of I8
-        let items = &[1u8, 2u8, 3u8];
-        let mut buffer: Vec<u8> = Vec::new();
-        buffer.extend_from_slice(header);
-        buffer.extend_from_slice(items);
-        let mut pos = 0;
-        skip_value(&buffer, &mut pos, ThriftID::List).unwrap();
-        assert_eq!(pos, 4);
-    }
-    #[test]
-    fn test_empty_map_skip() {
-        let buf = [0x00, 0xFF]; // count 0, no kv-type byte follows
-        let mut pos = 0;
-        skip_value(&buf, &mut pos, ThriftID::Map).unwrap();
-        assert_eq!(pos, 1);
-    }
-
-    #[test]
-    fn test_map_one_i8_to_i8_skip() {
-        let kv = ((ThriftID::I8 as u8) << 4) | ThriftID::I8 as u8;
-        let buf = [0x01, kv, 0xAA, 0xBB, 0xFF]; // count, kv-types, key, value
-        let mut pos = 0;
-        skip_value(&buf, &mut pos, ThriftID::Map).unwrap();
-        assert_eq!(pos, 4);
-    }
-
-    #[test]
-    fn test_struct_skip() {
-        // field id 1, type I8, value 0x42, then STOP
-        let buf = [fhead(1, ThriftID::I8), 0x42, ThriftID::Stop as u8, 0xFF];
-        let mut pos = 0;
-        skip_value(&buf, &mut pos, ThriftID::Struct).unwrap();
-        assert_eq!(pos, 3); // header + value + stop  -- FAILS on the inverted arm
-    }
-
-    #[test]
-    fn test_empty_struct_skip() {
-        let buf = [ThriftID::Stop as u8, 0xFF];
-        let mut pos = 0;
-        skip_value(&buf, &mut pos, ThriftID::Struct).unwrap();
-        assert_eq!(pos, 1); // -- the inverted arm bails here instead
-    }
-
-    #[test]
-    fn test_nested_list_of_structs_skip() {
-        // exercises recursion: list of 2 structs, each = one I8 field then STOP
-        let one = [fhead(1, ThriftID::I8), 0x09, ThriftID::Stop as u8];
-        let mut buf = vec![(2 << 4) | ThriftID::Struct as u8];
-        buf.extend_from_slice(&one);
-        buf.extend_from_slice(&one);
-        buf.push(0xFF);
-        let mut pos = 0;
-        skip_value(&buf, &mut pos, ThriftID::List).unwrap();
-        assert_eq!(pos, 1 + 3 + 3);
-    }
-
-    #[test]
-    fn test_stop_errors_skip() {
-        let mut pos = 0;
-        assert!(skip_value(&[0x00], &mut pos, ThriftID::Stop).is_err());
-    }
-
-    #[test]
-    fn test_truncated_binary_errors_skips() {
-        // claims length 16 but the bytes aren't there
-        let mut pos = 0;
-        assert!(skip_value(&[0x10], &mut pos, ThriftID::Binary).is_err());
-    }
     #[test]
     fn test_write_collection_header_small_count() {
         let mut buffer = Vec::new();
@@ -702,268 +531,461 @@ mod tests {
         assert_eq!(res_64, 0);
     }
 
-    #[test]
-    fn test_parse_key_value_simple() {
-        let mut key_value = Vec::new();
-        let mut pos = 0;
-        let field_id = (0x01 << 4) | ThriftID::Binary as u8;
-        // field 1 (key)
-        key_value.extend_from_slice(&[field_id]);
-        key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
-        key_value.extend_from_slice(b"key");
+    #[cfg(test)]
+    mod test_skips {
+        use super::*;
 
-        // field 2 (value)
-        key_value.extend_from_slice(&[field_id]);
-        key_value.extend_from_slice(&[u8::try_from(5).unwrap()]);
-        key_value.extend_from_slice(b"value");
-
-        // stop
-        key_value.extend_from_slice(&[0u8]);
-
-        let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
-        assert_eq!(res_key, "key".to_string());
-        assert!(res_value.is_some());
-        assert_eq!(res_value.unwrap(), "value".to_string());
-    }
-
-    #[test]
-    fn test_parse_key_value_missing_value() {
-        let mut key_value = Vec::new();
-        let mut pos = 0;
-        let field_id = (0x01 << 4) | ThriftID::Binary as u8;
-        // field 1 (key)
-        key_value.extend_from_slice(&[field_id]);
-        key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
-        key_value.extend_from_slice(b"key");
-
-        // stop
-        key_value.extend_from_slice(&[0u8]);
-
-        let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
-        assert_eq!(res_key, "key".to_string());
-        assert!(res_value.is_none());
-    }
-    #[test]
-    fn test_parse_key_value_extra_field_ignored() {
-        let mut key_value = Vec::new();
-        let mut pos = 0;
-        let field_id = (0x01 << 4) | ThriftID::Binary as u8;
-
-        // field 1 (key)
-        key_value.extend_from_slice(&[field_id]);
-        key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
-        key_value.extend_from_slice(b"key");
-
-        // field 2 (value)
-        key_value.extend_from_slice(&[field_id]);
-        key_value.extend_from_slice(&[u8::try_from(5).unwrap()]);
-        key_value.extend_from_slice(b"value");
-
-        // field 3
-        key_value.extend_from_slice(&[field_id]);
-        key_value.extend_from_slice(&[u8::try_from(6).unwrap()]);
-        key_value.extend_from_slice(b"ignore");
-
-        // stop
-        key_value.extend_from_slice(&[0u8]);
-
-        let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
-        assert_eq!(res_key, "key".to_string());
-        assert!(res_value.is_some());
-        assert_eq!(res_value.unwrap(), "value".to_string());
-    }
-
-    #[test]
-    fn test_encode_kv() {
-        let kvs = [
-            ("key_1".to_string(), Some("value_1".to_string())),
-            ("key_2".to_string(), Some("value_2".to_string())),
-            ("key_3".to_string(), None),
-        ];
-        let struct_header = (1u8 << 4) | ThriftID::Binary as u8;
-        let result = encode_kv_field(&kvs);
-
-        let mut answer = Vec::new();
-        answer.extend_from_slice(&[ThriftID::List as u8]);
-        answer.extend_from_slice(&[u8::try_from(zigzag(5)).unwrap()]); // field id of kv metadata
-        answer.extend_from_slice(&[(3 << 4) | ThriftID::Struct as u8]); // elements and type
-        answer.extend_from_slice(&[struct_header]);
-        answer.extend_from_slice(&[5u8]);
-        answer.extend_from_slice(b"key_1");
-        answer.extend_from_slice(&[struct_header]);
-        answer.extend_from_slice(&[7u8]);
-        answer.extend_from_slice(b"value_1");
-        answer.extend_from_slice(&[0u8]);
-
-        answer.extend_from_slice(&[struct_header]);
-        answer.extend_from_slice(&[5u8]);
-        answer.extend_from_slice(b"key_2");
-        answer.extend_from_slice(&[struct_header]);
-        answer.extend_from_slice(&[7u8]);
-        answer.extend_from_slice(b"value_2");
-        answer.extend_from_slice(&[0u8]);
-
-        answer.extend_from_slice(&[struct_header]);
-        answer.extend_from_slice(&[5u8]);
-        answer.extend_from_slice(b"key_3");
-        answer.extend_from_slice(&[0u8]);
-        assert_eq!(result, answer);
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::cast_possible_truncation)] // test fixtures use known-small values
-mod upsert_tests {
-    use super::*;
-
-    // short-form field header: id delta in high nibble, type in low nibble
-    fn fhead(delta: u8, t: ThriftID) -> u8 {
-        (delta << 4) | (t as u8)
-    }
-
-    // one KeyValue struct: key (field 1) + optional value (field 2) + STOP
-    fn kv_struct(key: &str, value: Option<&str>) -> Vec<u8> {
-        let mut b = vec![fhead(1, ThriftID::Binary), key.len() as u8];
-        b.extend_from_slice(key.as_bytes());
-        if let Some(v) = value {
-            b.push(fhead(1, ThriftID::Binary));
-            b.push(v.len() as u8);
-            b.extend_from_slice(v.as_bytes());
+        fn fhead(delta: u8, t: ThriftID) -> u8 {
+            (delta << 4) | t as u8
         }
-        b.push(ThriftID::Stop as u8);
-        b
-    }
-
-    // a FileMetaData footer whose field 5 holds `pairs`, then the struct STOP.
-    // field 5 is written long-form (header + zigzag(5)), like upsert itself emits.
-    fn footer_with_kv(pairs: &[(&str, Option<&str>)]) -> Vec<u8> {
-        let mut b = vec![ThriftID::List as u8, zigzag(5) as u8];
-        b.push(((pairs.len() as u8) << 4) | (ThriftID::Struct as u8)); // count < 15
-        for (k, v) in pairs {
-            b.extend_from_slice(&kv_struct(k, *v));
+        #[test]
+        fn test_bool_skip() {
+            let mut pos = 2;
+            let buffer = [0u8; 12];
+            skip_value(&buffer, &mut pos, ThriftID::BoolTrue).unwrap();
+            assert_eq!(pos, 2);
+            skip_value(&buffer, &mut pos, ThriftID::BoolFalse).unwrap();
+            assert_eq!(pos, 2);
         }
-        b.push(ThriftID::Stop as u8);
-        b
-    }
 
-    // same, but with a leading i64 field (id 3) that must be skipped first
-    fn footer_with_leading_field(pairs: &[(&str, Option<&str>)]) -> Vec<u8> {
-        let mut b = vec![fhead(3, ThriftID::I64)];
-        write_uvarint(&mut b, zigzag(42)); // num_rows-ish value
-        b.push(ThriftID::List as u8);
-        b.push(zigzag(5) as u8);
-        b.push(((pairs.len() as u8) << 4) | (ThriftID::Struct as u8));
-        for (k, v) in pairs {
-            b.extend_from_slice(&kv_struct(k, *v));
+        #[test]
+        fn test_i8_skip() {
+            let mut pos = 2;
+            let buffer: [u8; 5] = [5, 4, 3, 2, 1];
+            skip_value(&buffer, &mut pos, ThriftID::I8).unwrap();
+            assert_eq!(pos, 3);
+            skip_value(&buffer, &mut pos, ThriftID::I8).unwrap();
+            assert_eq!(pos, 4);
         }
-        b.push(ThriftID::Stop as u8);
-        b
+
+        #[test]
+        fn test_i16_i32_i64_skip() {
+            // 300 zigzag-or-not is irrelevant to skipping; as a varint it's [0xAC, 0x02]
+            let buf = [0xAC, 0x02, 0xFF];
+            let mut pos = 0;
+            skip_value(&buf, &mut pos, ThriftID::I64).unwrap();
+            assert_eq!(pos, 2);
+        }
+
+        #[test]
+        fn test_double_skip() {
+            let buf = [0u8; 9]; // 8 value bytes + sentinel
+            let mut pos = 0;
+            skip_value(&buf, &mut pos, ThriftID::Double).unwrap();
+            assert_eq!(pos, 8);
+        }
+
+        #[test]
+        fn test_binary_skip() {
+            let mut buffer: Vec<u8> = Vec::new();
+            let binary_length = &[5u8];
+            let string = b"hello";
+            buffer.extend_from_slice(binary_length);
+            buffer.extend_from_slice(string);
+            let mut pos = 0;
+            skip_value(&buffer, &mut pos, ThriftID::Binary).unwrap();
+            assert_eq!(pos, 6); // length byte + 5 bytes of hello
+        }
+
+        #[test]
+        fn test_list_i8_skip() {
+            let header = &[(3 << 4) | ThriftID::I8 as u8]; // sssstttt 3 counts of I8
+            let items = &[1u8, 2u8, 3u8];
+            let mut buffer: Vec<u8> = Vec::new();
+            buffer.extend_from_slice(header);
+            buffer.extend_from_slice(items);
+            let mut pos = 0;
+            skip_value(&buffer, &mut pos, ThriftID::List).unwrap();
+            assert_eq!(pos, 4);
+        }
+        #[test]
+        fn test_empty_map_skip() {
+            let buf = [0x00, 0xFF]; // count 0, no kv-type byte follows
+            let mut pos = 0;
+            skip_value(&buf, &mut pos, ThriftID::Map).unwrap();
+            assert_eq!(pos, 1);
+        }
+
+        #[test]
+        fn test_map_one_i8_to_i8_skip() {
+            let kv = ((ThriftID::I8 as u8) << 4) | ThriftID::I8 as u8;
+            let buf = [0x01, kv, 0xAA, 0xBB, 0xFF]; // count, kv-types, key, value
+            let mut pos = 0;
+            skip_value(&buf, &mut pos, ThriftID::Map).unwrap();
+            assert_eq!(pos, 4);
+        }
+
+        #[test]
+        fn test_struct_skip() {
+            // field id 1, type I8, value 0x42, then STOP
+            let buf = [fhead(1, ThriftID::I8), 0x42, ThriftID::Stop as u8, 0xFF];
+            let mut pos = 0;
+            skip_value(&buf, &mut pos, ThriftID::Struct).unwrap();
+            assert_eq!(pos, 3); // header + value + stop  -- FAILS on the inverted arm
+        }
+
+        #[test]
+        fn test_empty_struct_skip() {
+            let buf = [ThriftID::Stop as u8, 0xFF];
+            let mut pos = 0;
+            skip_value(&buf, &mut pos, ThriftID::Struct).unwrap();
+            assert_eq!(pos, 1); // -- the inverted arm bails here instead
+        }
+
+        #[test]
+        fn test_nested_list_of_structs_skip() {
+            // exercises recursion: list of 2 structs, each = one I8 field then STOP
+            let one = [fhead(1, ThriftID::I8), 0x09, ThriftID::Stop as u8];
+            let mut buf = vec![(2 << 4) | ThriftID::Struct as u8];
+            buf.extend_from_slice(&one);
+            buf.extend_from_slice(&one);
+            buf.push(0xFF);
+            let mut pos = 0;
+            skip_value(&buf, &mut pos, ThriftID::List).unwrap();
+            assert_eq!(pos, 1 + 3 + 3);
+        }
+
+        #[test]
+        fn test_stop_errors_skip() {
+            let mut pos = 0;
+            assert!(skip_value(&[0x00], &mut pos, ThriftID::Stop).is_err());
+        }
+
+        #[test]
+        fn test_truncated_binary_errors_skips() {
+            // claims length 16 but the bytes aren't there
+            let mut pos = 0;
+            assert!(skip_value(&[0x10], &mut pos, ThriftID::Binary).is_err());
+        }
     }
 
-    // read-only twin of upsert_kv: walk to field 5 and decode its pairs
-    fn read_kv_pairs(blob: &[u8]) -> Result<Vec<(String, Option<String>)>> {
-        let mut pos = 0usize;
-        let mut last_id = 0i64;
-        loop {
-            let (type_id, field_id) = read_field_header(blob, &mut pos, &mut last_id)?;
-            if type_id == ThriftID::Stop {
-                return Ok(Vec::new()); // no field 5 present
+    #[cfg(test)]
+    mod test_parse_key {
+        use super::*;
+
+        #[test]
+        fn test_parse_key_value_simple() {
+            let mut key_value = Vec::new();
+            let mut pos = 0;
+            let field_id = (0x01 << 4) | ThriftID::Binary as u8;
+            // field 1 (key)
+            key_value.extend_from_slice(&[field_id]);
+            key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
+            key_value.extend_from_slice(b"key");
+
+            // field 2 (value)
+            key_value.extend_from_slice(&[field_id]);
+            key_value.extend_from_slice(&[u8::try_from(5).unwrap()]);
+            key_value.extend_from_slice(b"value");
+
+            // stop
+            key_value.extend_from_slice(&[0u8]);
+
+            let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
+            assert_eq!(res_key, "key".to_string());
+            assert!(res_value.is_some());
+            assert_eq!(res_value.unwrap(), "value".to_string());
+        }
+
+        #[test]
+        fn test_parse_key_value_missing_value() {
+            let mut key_value = Vec::new();
+            let mut pos = 0;
+            let field_id = (0x01 << 4) | ThriftID::Binary as u8;
+            // field 1 (key)
+            key_value.extend_from_slice(&[field_id]);
+            key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
+            key_value.extend_from_slice(b"key");
+
+            // stop
+            key_value.extend_from_slice(&[0u8]);
+
+            let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
+            assert_eq!(res_key, "key".to_string());
+            assert!(res_value.is_none());
+        }
+        #[test]
+        fn test_parse_key_value_extra_field_ignored() {
+            let mut key_value = Vec::new();
+            let mut pos = 0;
+            let field_id = (0x01 << 4) | ThriftID::Binary as u8;
+
+            // field 1 (key)
+            key_value.extend_from_slice(&[field_id]);
+            key_value.extend_from_slice(&[u8::try_from(3).unwrap()]);
+            key_value.extend_from_slice(b"key");
+
+            // field 2 (value)
+            key_value.extend_from_slice(&[field_id]);
+            key_value.extend_from_slice(&[u8::try_from(5).unwrap()]);
+            key_value.extend_from_slice(b"value");
+
+            // field 3
+            key_value.extend_from_slice(&[field_id]);
+            key_value.extend_from_slice(&[u8::try_from(6).unwrap()]);
+            key_value.extend_from_slice(b"ignore");
+
+            // stop
+            key_value.extend_from_slice(&[0u8]);
+
+            let (res_key, res_value) = parse_key_value(&key_value, &mut pos).unwrap();
+            assert_eq!(res_key, "key".to_string());
+            assert!(res_value.is_some());
+            assert_eq!(res_value.unwrap(), "value".to_string());
+        }
+    }
+
+    #[cfg(test)]
+    mod test_encode_kv {
+        use super::*;
+        #[test]
+        fn test_encode_kv() {
+            let kvs = [
+                ("key_1".to_string(), Some("value_1".to_string())),
+                ("key_2".to_string(), Some("value_2".to_string())),
+                ("key_3".to_string(), None),
+            ];
+            let struct_header = (1u8 << 4) | ThriftID::Binary as u8;
+            let result = encode_kv_field(&kvs);
+
+            let mut answer = Vec::new();
+            answer.extend_from_slice(&[ThriftID::List as u8]);
+            answer.extend_from_slice(&[u8::try_from(zigzag(5)).unwrap()]); // field id of kv metadata
+            answer.extend_from_slice(&[(3 << 4) | ThriftID::Struct as u8]); // elements and type
+            answer.extend_from_slice(&[struct_header]);
+            answer.extend_from_slice(&[5u8]);
+            answer.extend_from_slice(b"key_1");
+            answer.extend_from_slice(&[struct_header]);
+            answer.extend_from_slice(&[7u8]);
+            answer.extend_from_slice(b"value_1");
+            answer.extend_from_slice(&[0u8]);
+
+            answer.extend_from_slice(&[struct_header]);
+            answer.extend_from_slice(&[5u8]);
+            answer.extend_from_slice(b"key_2");
+            answer.extend_from_slice(&[struct_header]);
+            answer.extend_from_slice(&[7u8]);
+            answer.extend_from_slice(b"value_2");
+            answer.extend_from_slice(&[0u8]);
+
+            answer.extend_from_slice(&[struct_header]);
+            answer.extend_from_slice(&[5u8]);
+            answer.extend_from_slice(b"key_3");
+            answer.extend_from_slice(&[0u8]);
+            assert_eq!(result, answer);
+        }
+    }
+
+    #[cfg(test)]
+    #[allow(clippy::cast_possible_truncation)] // test fixtures use known-small values
+    mod upsert_tests {
+        use super::*;
+
+        // short-form field header: id delta in high nibble, type in low nibble
+        fn fhead(delta: u8, t: ThriftID) -> u8 {
+            (delta << 4) | (t as u8)
+        }
+
+        // one KeyValue struct: key (field 1) + optional value (field 2) + STOP
+        fn kv_struct(key: &str, value: Option<&str>) -> Vec<u8> {
+            let mut b = vec![fhead(1, ThriftID::Binary), key.len() as u8];
+            b.extend_from_slice(key.as_bytes());
+            if let Some(v) = value {
+                b.push(fhead(1, ThriftID::Binary));
+                b.push(v.len() as u8);
+                b.extend_from_slice(v.as_bytes());
             }
-            if field_id == KEY_VALUE_FIELD_ID {
-                let (_elem, count) = read_collection_header(blob, &mut pos)?;
-                let mut pairs = Vec::new();
-                for _ in 0..count {
-                    pairs.push(parse_key_value(blob, &mut pos)?);
+            b.push(ThriftID::Stop as u8);
+            b
+        }
+
+        // a FileMetaData footer whose field 5 holds `pairs`, then the struct STOP.
+        // field 5 is written long-form (header + zigzag(5)), like upsert itself emits.
+        fn footer_with_kv(pairs: &[(&str, Option<&str>)]) -> Vec<u8> {
+            let mut b = vec![ThriftID::List as u8, zigzag(5) as u8];
+            b.push(((pairs.len() as u8) << 4) | (ThriftID::Struct as u8)); // count < 15
+            for (k, v) in pairs {
+                b.extend_from_slice(&kv_struct(k, *v));
+            }
+            b.push(ThriftID::Stop as u8);
+            b
+        }
+
+        // same, but with a leading i64 field (id 3) that must be skipped first
+        fn footer_with_leading_field(pairs: &[(&str, Option<&str>)]) -> Vec<u8> {
+            let mut b = vec![fhead(3, ThriftID::I64)];
+            write_uvarint(&mut b, zigzag(42)); // num_rows-ish value
+            b.push(ThriftID::List as u8);
+            b.push(zigzag(5) as u8);
+            b.push(((pairs.len() as u8) << 4) | (ThriftID::Struct as u8));
+            for (k, v) in pairs {
+                b.extend_from_slice(&kv_struct(k, *v));
+            }
+            b.push(ThriftID::Stop as u8);
+            b
+        }
+
+        // read-only twin of upsert_kv: walk to field 5 and decode its pairs
+        fn read_kv_pairs(blob: &[u8]) -> Result<Vec<(String, Option<String>)>> {
+            let mut pos = 0usize;
+            let mut last_id = 0i64;
+            loop {
+                let (type_id, field_id) = read_field_header(blob, &mut pos, &mut last_id)?;
+                if type_id == ThriftID::Stop {
+                    return Ok(Vec::new()); // no field 5 present
                 }
-                return Ok(pairs);
+                if field_id == KEY_VALUE_FIELD_ID {
+                    let (_elem, count) = read_collection_header(blob, &mut pos)?;
+                    let mut pairs = Vec::new();
+                    for _ in 0..count {
+                        pairs.push(parse_key_value(blob, &mut pos)?);
+                    }
+                    return Ok(pairs);
+                }
+                skip_value(blob, &mut pos, type_id)?;
             }
-            skip_value(blob, &mut pos, type_id)?;
+        }
+
+        // build expected owned pairs for assertions
+        fn owned(pairs: &[(&str, Option<&str>)]) -> Vec<(String, Option<String>)> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.map(str::to_string)))
+                .collect()
+        }
+
+        #[test]
+        fn inserts_field5_when_absent() {
+            let blob = [ThriftID::Stop as u8]; // empty FileMetaData struct
+            let out = upsert_kv(&blob, "maml", "hello").unwrap();
+            assert_eq!(
+                read_kv_pairs(&out).unwrap(),
+                owned(&[("maml", Some("hello"))])
+            );
+        }
+
+        #[test]
+        fn appends_when_key_absent() {
+            let blob = footer_with_kv(&[("a", Some("1"))]);
+            let out = upsert_kv(&blob, "maml", "v").unwrap();
+            assert_eq!(
+                read_kv_pairs(&out).unwrap(),
+                owned(&[("a", Some("1")), ("maml", Some("v"))])
+            );
+        }
+
+        #[test]
+        fn replaces_existing_key_and_preserves_others() {
+            let blob = footer_with_kv(&[("ARROW:schema", Some("xyz")), ("maml", Some("old"))]);
+            let out = upsert_kv(&blob, "maml", "new").unwrap();
+            // maml dropped then re-pushed at the end; the other key survives untouched
+            assert_eq!(
+                read_kv_pairs(&out).unwrap(),
+                owned(&[("ARROW:schema", Some("xyz")), ("maml", Some("new"))])
+            );
+        }
+
+        #[test]
+        fn no_duplicate_maml_after_replace() {
+            let blob = footer_with_kv(&[("maml", Some("old"))]);
+            let out = upsert_kv(&blob, "maml", "new").unwrap();
+            let pairs = read_kv_pairs(&out).unwrap();
+            assert_eq!(pairs.iter().filter(|(k, _)| k == "maml").count(), 1);
+            assert_eq!(pairs[0].1.as_deref(), Some("new"));
+        }
+
+        #[test]
+        fn skips_leading_fields_to_find_field5() {
+            let blob = footer_with_leading_field(&[("a", Some("1"))]);
+            let out = upsert_kv(&blob, "maml", "v").unwrap();
+            assert_eq!(
+                read_kv_pairs(&out).unwrap(),
+                owned(&[("a", Some("1")), ("maml", Some("v"))])
+            );
+        }
+
+        #[test]
+        fn handles_empty_kv_list() {
+            let blob = footer_with_kv(&[]); // field 5 present but count 0
+            let out = upsert_kv(&blob, "maml", "v").unwrap();
+            assert_eq!(read_kv_pairs(&out).unwrap(), owned(&[("maml", Some("v"))]));
+        }
+
+        #[test]
+        fn idempotent_re_tag() {
+            // tag, then tag again — exercises reading back our OWN long-form field 5
+            let blob = [ThriftID::Stop as u8];
+            let once = upsert_kv(&blob, "maml", "v1").unwrap();
+            let twice = upsert_kv(&once, "maml", "v2").unwrap();
+            assert_eq!(
+                read_kv_pairs(&twice).unwrap(),
+                owned(&[("maml", Some("v2"))])
+            );
+        }
+
+        #[test]
+        fn rejects_field5_with_wrong_type() {
+            // field 5 present but encoded as i64 instead of a list
+            let mut blob = vec![ThriftID::I64 as u8, zigzag(5) as u8];
+            write_uvarint(&mut blob, zigzag(7)); // some i64 value
+            blob.push(ThriftID::Stop as u8);
+            assert!(upsert_kv(&blob, "maml", "v").is_err());
         }
     }
 
-    // build expected owned pairs for assertions
-    fn owned(pairs: &[(&str, Option<&str>)]) -> Vec<(String, Option<String>)> {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.map(str::to_string)))
-            .collect()
+    #[cfg(test)]
+    mod test_zigzag {
+        use super::*;
+        // tests for zigzag taken from zigzag crate
+        // (https://github.com/Adancurusul/zigzag-rs/blob/master/src/lib.rs)
+        #[test]
+        fn test_zigzag_i64() {
+            assert_eq!(zigzag(0), 0u64);
+            assert_eq!(zigzag(-1), 1u64);
+            assert_eq!(zigzag(1), 2u64);
+            assert_eq!(zigzag(-2), 3u64);
+            assert_eq!(zigzag(2), 4u64);
+        }
+
+        #[test]
+        fn decode_zigzag_i64() {
+            assert_eq!(unzigzag(0u64), 0);
+            assert_eq!(unzigzag(1u64), -1);
+            assert_eq!(unzigzag(2u64), 1);
+            assert_eq!(unzigzag(3u64), -2);
+            assert_eq!(unzigzag(4u64), 2);
+        }
     }
 
-    #[test]
-    fn inserts_field5_when_absent() {
-        let blob = [ThriftID::Stop as u8]; // empty FileMetaData struct
-        let out = upsert_kv(&blob, "maml", "hello").unwrap();
-        assert_eq!(
-            read_kv_pairs(&out).unwrap(),
-            owned(&[("maml", Some("hello"))])
-        );
-    }
+    #[cfg(test)]
+    mod test_uvarint {
+        use super::*;
+        #[test]
+        fn test_write_uvarint() {
+            // simple 1 = 1 case
+            let mut test_value = Vec::new();
+            let ans = vec![1u8];
+            write_uvarint(&mut test_value, 1u64);
+            assert_eq!(test_value, ans);
 
-    #[test]
-    fn appends_when_key_absent() {
-        let blob = footer_with_kv(&[("a", Some("1"))]);
-        let out = upsert_kv(&blob, "maml", "v").unwrap();
-        assert_eq!(
-            read_kv_pairs(&out).unwrap(),
-            owned(&[("a", Some("1")), ("maml", Some("v"))])
-        );
-    }
+            // 60_000 worked example case
+            let mut test_value = Vec::new();
+            let ans = vec![224u8, 212u8, 3u8];
+            write_uvarint(&mut test_value, 60_000u64);
+            assert_eq!(test_value, ans);
+        }
 
-    #[test]
-    fn replaces_existing_key_and_preserves_others() {
-        let blob = footer_with_kv(&[("ARROW:schema", Some("xyz")), ("maml", Some("old"))]);
-        let out = upsert_kv(&blob, "maml", "new").unwrap();
-        // maml dropped then re-pushed at the end; the other key survives untouched
-        assert_eq!(
-            read_kv_pairs(&out).unwrap(),
-            owned(&[("ARROW:schema", Some("xyz")), ("maml", Some("new"))])
-        );
-    }
+        #[test]
+        fn test_read_uvarint() {
+            // simple 1 = 1 case
+            let mut pos = 1usize;
+            let buffer = vec![2u8, 1u8, 224u8, 212u8, 3u8];
 
-    #[test]
-    fn no_duplicate_maml_after_replace() {
-        let blob = footer_with_kv(&[("maml", Some("old"))]);
-        let out = upsert_kv(&blob, "maml", "new").unwrap();
-        let pairs = read_kv_pairs(&out).unwrap();
-        assert_eq!(pairs.iter().filter(|(k, _)| k == "maml").count(), 1);
-        assert_eq!(pairs[0].1.as_deref(), Some("new"));
-    }
-
-    #[test]
-    fn skips_leading_fields_to_find_field5() {
-        let blob = footer_with_leading_field(&[("a", Some("1"))]);
-        let out = upsert_kv(&blob, "maml", "v").unwrap();
-        assert_eq!(
-            read_kv_pairs(&out).unwrap(),
-            owned(&[("a", Some("1")), ("maml", Some("v"))])
-        );
-    }
-
-    #[test]
-    fn handles_empty_kv_list() {
-        let blob = footer_with_kv(&[]); // field 5 present but count 0
-        let out = upsert_kv(&blob, "maml", "v").unwrap();
-        assert_eq!(read_kv_pairs(&out).unwrap(), owned(&[("maml", Some("v"))]));
-    }
-
-    #[test]
-    fn idempotent_re_tag() {
-        // tag, then tag again — exercises reading back our OWN long-form field 5
-        let blob = [ThriftID::Stop as u8];
-        let once = upsert_kv(&blob, "maml", "v1").unwrap();
-        let twice = upsert_kv(&once, "maml", "v2").unwrap();
-        assert_eq!(
-            read_kv_pairs(&twice).unwrap(),
-            owned(&[("maml", Some("v2"))])
-        );
-    }
-
-    #[test]
-    fn rejects_field5_with_wrong_type() {
-        // field 5 present but encoded as i64 instead of a list
-        let mut blob = vec![ThriftID::I64 as u8, zigzag(5) as u8];
-        write_uvarint(&mut blob, zigzag(7)); // some i64 value
-        blob.push(ThriftID::Stop as u8);
-        assert!(upsert_kv(&blob, "maml", "v").is_err());
+            let res_1 = read_uvarint(&buffer, &mut pos).unwrap();
+            assert_eq!(res_1, 1u64);
+            // 60k test
+            let res_60k = read_uvarint(&buffer, &mut pos).unwrap();
+            assert_eq!(res_60k, 60_000u64);
+        }
     }
 }
