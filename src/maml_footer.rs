@@ -59,6 +59,7 @@ impl TryFrom<u8> for ThriftID {
 }
 
 /// Insert/replace the `maml` key in `output_path`'s footer, in place.
+/// This is the custom waves maml function. But we could upsert to be generalized in the future
 pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
     let mut file = OpenOptions::new()
         .read(true)
@@ -105,22 +106,22 @@ pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
 }
 
 /// Walk the top-level `FileMetaData` fields, upsert `key`=`value` into the
-/// key/value metadata list, and return `(new_footer_blob, key_already_existed)`.
-fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
+/// This is the general add a new key-word value in the metadata
+fn upsert_kv(metadata_blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
     let mut pos = 0usize;
     let mut last_id = 0i64;
 
     loop {
         let field_start = pos;
-        let (type_id, field_id) = read_field_header(blob, &mut pos, &mut last_id)?;
+        let (type_id, field_id) = read_field_header(metadata_blob, &mut pos, &mut last_id)?;
 
         if let ThriftID::Stop = type_id {
             // No field 5: insert a fresh one right before STOP.
             let field = encode_kv_field(&[(key.to_string(), Some(value.to_string()))]);
-            let mut out = Vec::with_capacity(blob.len() + field.len());
-            out.extend_from_slice(&blob[..field_start]); // everything before STOP
+            let mut out = Vec::with_capacity(metadata_blob.len() + field.len());
+            out.extend_from_slice(&metadata_blob[..field_start]); // everything before STOP
             out.extend_from_slice(&field);
-            out.extend_from_slice(&blob[field_start..]); // the STOP byte
+            out.extend_from_slice(&metadata_blob[field_start..]); // the STOP byte
             return Ok(out);
         }
 
@@ -128,13 +129,13 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
             if type_id != ThriftID::List {
                 bail!("key_value_metadata is not a list (thrift type {type_id:?})");
             }
-            let (elem_type, count) = read_collection_header(blob, &mut pos)?;
+            let (elem_type, count) = read_collection_header(metadata_blob, &mut pos)?;
             if count > 0 && elem_type != ThriftID::Struct {
                 bail!("key_value_metadata elements are not structs");
             }
             let mut pairs = Vec::with_capacity(usize::try_from(count)? + 1);
             for _ in 0..count {
-                pairs.push(parse_key_value(blob, &mut pos)?);
+                pairs.push(parse_key_value(metadata_blob, &mut pos)?);
             }
             let list_end = pos; // first byte after the list = next field header
 
@@ -142,14 +143,14 @@ fn upsert_kv(blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
             pairs.push((key.to_string(), Some(value.to_string())));
 
             let field = encode_kv_field(&pairs);
-            let mut out = Vec::with_capacity(blob.len() + field.len());
-            out.extend_from_slice(&blob[..field_start]); // fields before field 5
+            let mut out = Vec::with_capacity(metadata_blob.len() + field.len());
+            out.extend_from_slice(&metadata_blob[..field_start]); // fields before field 5
             out.extend_from_slice(&field); // freshly encoded field 5 (long-form header)
-            out.extend_from_slice(&blob[list_end..]); // fields after field 5 + STOP
+            out.extend_from_slice(&metadata_blob[list_end..]); // fields after field 5 + STOP
             return Ok(out);
         }
 
-        skip_value(blob, &mut pos, type_id)?;
+        skip_value(metadata_blob, &mut pos, type_id)?;
     }
 }
 
@@ -807,5 +808,162 @@ mod tests {
         answer.extend_from_slice(b"key_3");
         answer.extend_from_slice(&[0u8]);
         assert_eq!(result, answer);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::cast_possible_truncation)] // test fixtures use known-small values
+mod upsert_tests {
+    use super::*;
+
+    // short-form field header: id delta in high nibble, type in low nibble
+    fn fhead(delta: u8, t: ThriftID) -> u8 {
+        (delta << 4) | (t as u8)
+    }
+
+    // one KeyValue struct: key (field 1) + optional value (field 2) + STOP
+    fn kv_struct(key: &str, value: Option<&str>) -> Vec<u8> {
+        let mut b = vec![fhead(1, ThriftID::Binary), key.len() as u8];
+        b.extend_from_slice(key.as_bytes());
+        if let Some(v) = value {
+            b.push(fhead(1, ThriftID::Binary));
+            b.push(v.len() as u8);
+            b.extend_from_slice(v.as_bytes());
+        }
+        b.push(ThriftID::Stop as u8);
+        b
+    }
+
+    // a FileMetaData footer whose field 5 holds `pairs`, then the struct STOP.
+    // field 5 is written long-form (header + zigzag(5)), like upsert itself emits.
+    fn footer_with_kv(pairs: &[(&str, Option<&str>)]) -> Vec<u8> {
+        let mut b = vec![ThriftID::List as u8, zigzag(5) as u8];
+        b.push(((pairs.len() as u8) << 4) | (ThriftID::Struct as u8)); // count < 15
+        for (k, v) in pairs {
+            b.extend_from_slice(&kv_struct(k, *v));
+        }
+        b.push(ThriftID::Stop as u8);
+        b
+    }
+
+    // same, but with a leading i64 field (id 3) that must be skipped first
+    fn footer_with_leading_field(pairs: &[(&str, Option<&str>)]) -> Vec<u8> {
+        let mut b = vec![fhead(3, ThriftID::I64)];
+        write_uvarint(&mut b, zigzag(42)); // num_rows-ish value
+        b.push(ThriftID::List as u8);
+        b.push(zigzag(5) as u8);
+        b.push(((pairs.len() as u8) << 4) | (ThriftID::Struct as u8));
+        for (k, v) in pairs {
+            b.extend_from_slice(&kv_struct(k, *v));
+        }
+        b.push(ThriftID::Stop as u8);
+        b
+    }
+
+    // read-only twin of upsert_kv: walk to field 5 and decode its pairs
+    fn read_kv_pairs(blob: &[u8]) -> Result<Vec<(String, Option<String>)>> {
+        let mut pos = 0usize;
+        let mut last_id = 0i64;
+        loop {
+            let (type_id, field_id) = read_field_header(blob, &mut pos, &mut last_id)?;
+            if type_id == ThriftID::Stop {
+                return Ok(Vec::new()); // no field 5 present
+            }
+            if field_id == KEY_VALUE_FIELD_ID {
+                let (_elem, count) = read_collection_header(blob, &mut pos)?;
+                let mut pairs = Vec::new();
+                for _ in 0..count {
+                    pairs.push(parse_key_value(blob, &mut pos)?);
+                }
+                return Ok(pairs);
+            }
+            skip_value(blob, &mut pos, type_id)?;
+        }
+    }
+
+    // build expected owned pairs for assertions
+    fn owned(pairs: &[(&str, Option<&str>)]) -> Vec<(String, Option<String>)> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.map(str::to_string)))
+            .collect()
+    }
+
+    #[test]
+    fn inserts_field5_when_absent() {
+        let blob = [ThriftID::Stop as u8]; // empty FileMetaData struct
+        let out = upsert_kv(&blob, "maml", "hello").unwrap();
+        assert_eq!(
+            read_kv_pairs(&out).unwrap(),
+            owned(&[("maml", Some("hello"))])
+        );
+    }
+
+    #[test]
+    fn appends_when_key_absent() {
+        let blob = footer_with_kv(&[("a", Some("1"))]);
+        let out = upsert_kv(&blob, "maml", "v").unwrap();
+        assert_eq!(
+            read_kv_pairs(&out).unwrap(),
+            owned(&[("a", Some("1")), ("maml", Some("v"))])
+        );
+    }
+
+    #[test]
+    fn replaces_existing_key_and_preserves_others() {
+        let blob = footer_with_kv(&[("ARROW:schema", Some("xyz")), ("maml", Some("old"))]);
+        let out = upsert_kv(&blob, "maml", "new").unwrap();
+        // maml dropped then re-pushed at the end; the other key survives untouched
+        assert_eq!(
+            read_kv_pairs(&out).unwrap(),
+            owned(&[("ARROW:schema", Some("xyz")), ("maml", Some("new"))])
+        );
+    }
+
+    #[test]
+    fn no_duplicate_maml_after_replace() {
+        let blob = footer_with_kv(&[("maml", Some("old"))]);
+        let out = upsert_kv(&blob, "maml", "new").unwrap();
+        let pairs = read_kv_pairs(&out).unwrap();
+        assert_eq!(pairs.iter().filter(|(k, _)| k == "maml").count(), 1);
+        assert_eq!(pairs[0].1.as_deref(), Some("new"));
+    }
+
+    #[test]
+    fn skips_leading_fields_to_find_field5() {
+        let blob = footer_with_leading_field(&[("a", Some("1"))]);
+        let out = upsert_kv(&blob, "maml", "v").unwrap();
+        assert_eq!(
+            read_kv_pairs(&out).unwrap(),
+            owned(&[("a", Some("1")), ("maml", Some("v"))])
+        );
+    }
+
+    #[test]
+    fn handles_empty_kv_list() {
+        let blob = footer_with_kv(&[]); // field 5 present but count 0
+        let out = upsert_kv(&blob, "maml", "v").unwrap();
+        assert_eq!(read_kv_pairs(&out).unwrap(), owned(&[("maml", Some("v"))]));
+    }
+
+    #[test]
+    fn idempotent_re_tag() {
+        // tag, then tag again — exercises reading back our OWN long-form field 5
+        let blob = [ThriftID::Stop as u8];
+        let once = upsert_kv(&blob, "maml", "v1").unwrap();
+        let twice = upsert_kv(&once, "maml", "v2").unwrap();
+        assert_eq!(
+            read_kv_pairs(&twice).unwrap(),
+            owned(&[("maml", Some("v2"))])
+        );
+    }
+
+    #[test]
+    fn rejects_field5_with_wrong_type() {
+        // field 5 present but encoded as i64 instead of a list
+        let mut blob = vec![ThriftID::I64 as u8, zigzag(5) as u8];
+        write_uvarint(&mut blob, zigzag(7)); // some i64 value
+        blob.push(ThriftID::Stop as u8);
+        assert!(upsert_kv(&blob, "maml", "v").is_err());
     }
 }
