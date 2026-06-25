@@ -22,3 +22,7 @@ fitsio-pure = { version = "0.11.0", features = ["compat"] }
 polars = { version = "0.54.4", features = ["parquet", "csv", "dtype-i16", "lazy", "dtype-decimal", "strings", "streaming"] }
 polars-buffer = "0.54.4"
 rayon = "1.12.0"
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+tempfile = "3.27.0"
