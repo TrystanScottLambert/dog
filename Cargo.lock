@@ -695,7 +695,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dog"
+name = "dog-tsl"
 version = "0.5.2"
 dependencies = [
  "anyhow",
