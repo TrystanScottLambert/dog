@@ -1,7 +1,16 @@
 [package]
-name = "dog"
+name = "dog-tsl"
 version = "0.5.2"
 edition = "2021"
+readme = "README.md"
+description = "A fast cli tool for viewing and handling parquet and other file formats."
+authors = ["Trystan Lambert <trystan.lambert@uwa.edu.au>"]
+license = "MIT"
+repository = "https://github.com/TrystanScottLambert/dog"
+
+[[bin]]
+path = "src/main.rs"
+name = "dog"
 
 [profile.release]
 opt-level = 3
