@@ -15,6 +15,22 @@ However, `cat` is not useful for some file formats which are not simple text fil
 `dog` aims to be an alternative to `cat` for these kinds of files. 
 
 # Installation	
+There are multiple ways to install dog including using `cargo`, installing the binary directory, and building from source.
+
+## Cargo
+This is very very very easy.
+
+If you have rust and `cargo` installed then you can simply install dog with 
+```
+cargo install dog-tsl
+```
+that's it. The install might take a while as some optimizations take place.
+
+If you don't have rust for some reason and want to install it (and `cargo`) then you can *easily* do that with
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+Or read the [rust install documentation](https://rust-lang.org/tools/install/). The rust environment is made to be easy to use. So embrace it.
 
 ## Downloading the binary
 The first step is to determine what architecture your system is running. This can be done with 
@@ -35,7 +51,6 @@ curl -L -o dog https://github.com/trystanscottlambert/dog/releases/download/v0.5
 chmod +x dog
 sudo mv dog /usr/local/bin/
 ```
-
 
 should work. 
 
