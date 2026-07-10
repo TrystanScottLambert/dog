@@ -108,8 +108,9 @@ pub fn build_cli() -> Command {
             Arg::new("filter")
                 .long("filter")
                 .short('f')
-                .help("Filter rows based on some selection.")
+                .help("Filter rows based on some selection. E.g. ra<10")
                 .num_args(1)
+                .value_name("sql-like row selection")
                 .conflicts_with_all(["convert", "insert-maml", "schema", "maml"]),
         )
         .group(
