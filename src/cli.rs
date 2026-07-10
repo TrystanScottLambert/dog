@@ -104,6 +104,14 @@ pub fn build_cli() -> Command {
                 .help("Attempts to convert csv and fits files into a parquet if it can.")
                 .action(ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("filter")
+                .long("filter")
+                .short('f')
+                .help("Filter rows based on some selection.")
+                .num_args(1)
+                .conflicts_with_all(["convert", "insert-maml", "schema", "maml"]),
+        )
         .group(
             ArgGroup::new("mode")
                 .args([
