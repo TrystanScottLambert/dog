@@ -148,10 +148,23 @@ the `-c --columns` option can be used *in combination* with all the other option
 dog -c ra,dec -t test_file.parquet
 ```
 
-This is more useful when combined with the "summary" and "peak" options.
+### Selecting certain rows using sql-like selection
+`dog` supports sql-like filtering to select rows which can be used in combination with many of the other commands by using the `-f` `--filter` command. For example, if we only want to look at the parquet file where declination is positive and all redshifts are less than 0.2 then we can do:
+```
+dog -f 'dec>0 and redshift < 0.2' example.parquet 
+```
+This can then be used in combination with other commands.
+
+### Saving a sub-sample
+The `-o` `--outfile` flag can be used to write a parquet file. This will only be done if `-c` or `-f`  have been used to select columns and rows. So if we wanted to only have the ra and dec of all galaxies that are below a redshift of 0.2 then 
+```
+dog -c ra,dec -f 'redshift < 0' -o subsample.parquet mainsample.parquet
+```
+will do it. 
+
 
 ### Summary
-A summary of the entire contents is availble with the `-s --summary` option. 
+A summary of the entire contents is available with the `-s --summary` option. 
 
 ```bash
 dog -s test_file.parquet
