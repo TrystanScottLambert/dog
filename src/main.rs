@@ -1,4 +1,5 @@
 mod cli;
+mod filter;
 mod maml_footer;
 mod printer;
 mod reader;
@@ -6,6 +7,7 @@ mod write;
 
 use std::path::PathBuf;
 
+use crate::filter::parse_selection_string;
 use crate::maml_footer::write_waves_metadata;
 use crate::printer::*;
 use crate::reader::{read_file, read_yaml, which_file, FileType};
@@ -33,12 +35,25 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         write_waves_metadata(&file_path, &maml)?;
         return Ok(());
     }
+
     let mut lazy_frame = read_file(file_path.clone())?;
 
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
         let columns: Vec<Expr> = columns.map(col).collect();
         lazy_frame = lazy_frame.select(columns);
+    }
+
+    if let Some(filter_selection) = matches.get_many::<String>("filter") {
+        let argument: Vec<String> = filter_selection.map(|c| c.to_string()).collect();
+        let polars_expresion = match parse_selection_string(&argument[0]) {
+            Ok(expr) => expr,
+            _ => anyhow::bail!(
+                "Error parsing the filter selection string: {}",
+                &argument[0]
+            ),
+        };
+        lazy_frame = lazy_frame.filter(polars_expresion)
     }
 
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
