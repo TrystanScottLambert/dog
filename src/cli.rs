@@ -104,6 +104,23 @@ pub fn build_cli() -> Command {
                 .help("Attempts to convert csv and fits files into a parquet if it can.")
                 .action(ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("filter")
+                .long("filter")
+                .short('f')
+                .help("Filter rows based on some selection. E.g. ra<10")
+                .num_args(1)
+                .value_name("sql-like row selection")
+                .conflicts_with_all(["convert", "insert-maml", "schema", "maml"]),
+        )
+        .arg(
+            Arg::new("outfile")
+                .long("outfile")
+                .short('o')
+                .help("Save the current selection to the outfile")
+                .num_args(1)
+                .value_name("outfile-name"),
+        )
         .group(
             ArgGroup::new("mode")
                 .args([
@@ -118,6 +135,7 @@ pub fn build_cli() -> Command {
                     "stats",
                     "maml",
                     "schema",
+                    "outfile",
                 ])
                 .multiple(false),
         )

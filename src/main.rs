@@ -1,4 +1,5 @@
 mod cli;
+mod filter;
 mod maml_footer;
 mod printer;
 mod reader;
@@ -6,6 +7,7 @@ mod write;
 
 use std::path::PathBuf;
 
+use crate::filter::parse_selection_string;
 use crate::maml_footer::write_waves_metadata;
 use crate::printer::*;
 use crate::reader::{read_file, read_yaml, which_file, FileType};
@@ -33,12 +35,38 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         write_waves_metadata(&file_path, &maml)?;
         return Ok(());
     }
+
     let mut lazy_frame = read_file(file_path.clone())?;
+    let mut columns_selected = false;
+    let mut rows_selected = false;
 
     // Optional column filtering BEFORE any printing
     if let Some(columns) = matches.get_many::<String>("columns") {
         let columns: Vec<Expr> = columns.map(col).collect();
         lazy_frame = lazy_frame.select(columns);
+        columns_selected = true;
+    }
+
+    if let Some(filter_selection) = matches.get_one::<String>("filter") {
+        let polars_expresion = match parse_selection_string(filter_selection) {
+            Ok(expr) => expr,
+            _ => anyhow::bail!(
+                "Error parsing the filter selection string: {}",
+                filter_selection
+            ),
+        };
+        lazy_frame = lazy_frame.filter(polars_expresion);
+        rows_selected = true;
+    }
+
+    if let Some(outfile_name) = matches.get_one::<String>("outfile") {
+        if rows_selected | columns_selected {
+            write_parquet(&lazy_frame, &PathBuf::from(outfile_name))?;
+
+            return Ok(());
+        } else {
+            anyhow::bail!("File not saved. No columns or rows have been selected.")
+        }
     }
 
     if *matches.get_one::<bool>("names").unwrap_or(&false) {
@@ -65,7 +93,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             FileType::Fits => PathBuf::from(file.replace(".fits", "_converted.parquet")),
             FileType::Parquet => panic!("File is already a parquet!"),
         };
-        write_parquet(lazy_frame, &outfile).unwrap();
+        write_parquet(&lazy_frame, &outfile).unwrap();
     } else {
         print_only_data(lazy_frame, true)?;
     }
