@@ -113,6 +113,14 @@ pub fn build_cli() -> Command {
                 .value_name("sql-like row selection")
                 .conflicts_with_all(["convert", "insert-maml", "schema", "maml"]),
         )
+        .arg(
+            Arg::new("outfile")
+                .long("outfile")
+                .short('o')
+                .help("Save the current selection to the outfile")
+                .num_args(1)
+                .value_name("outfile-name"),
+        )
         .group(
             ArgGroup::new("mode")
                 .args([
@@ -127,6 +135,7 @@ pub fn build_cli() -> Command {
                     "stats",
                     "maml",
                     "schema",
+                    "outfile",
                 ])
                 .multiple(false),
         )
