@@ -705,6 +705,8 @@ dependencies = [
  "fitsio-pure",
  "polars",
  "polars-buffer",
+ "predicate",
+ "predicates",
  "rayon",
  "tempfile",
 ]
@@ -1524,6 +1526,12 @@ dependencies = [
  "wasi",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "normalize-line-endings"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "now"
@@ -2376,6 +2384,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "predicate"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e32f700c6541a5d7062a2b5b73eba1c0b64031f26f3357720bec60729b6a8e05"
+
+[[package]]
 name = "predicates"
 version = "3.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2383,7 +2397,10 @@ checksum = "ada8f2932f28a27ee7b70dd6c1c39ea0675c55a36879ab92f3a715eaa1e63cfe"
 dependencies = [
  "anstyle",
  "difflib",
+ "float-cmp",
+ "normalize-line-endings",
  "predicates-core",
+ "regex",
 ]
 
 [[package]]
