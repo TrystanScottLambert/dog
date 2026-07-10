@@ -705,7 +705,6 @@ dependencies = [
  "fitsio-pure",
  "polars",
  "polars-buffer",
- "predicate",
  "predicates",
  "rayon",
  "tempfile",
@@ -2382,12 +2381,6 @@ checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
 ]
-
-[[package]]
-name = "predicate"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e32f700c6541a5d7062a2b5b73eba1c0b64031f26f3357720bec60729b6a8e05"
 
 [[package]]
 name = "predicates"
