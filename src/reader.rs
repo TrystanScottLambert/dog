@@ -120,6 +120,11 @@ pub fn read_fits_file(path: &PathBuf) -> Result<LazyFrame> {
                             let ca = Int32Chunked::from_vec(col_name.into(), data);
                             ca.into_series().into()
                         }
+                        'L' => {
+                            let data: Vec<bool> = local_hdu.read_col(&local_fptr, col_name)?;
+                            let ca = BooleanChunked::from_iter_values(col_name.into(), data.into_iter());
+                            ca.into_series().into()
+                        }
                         _ => {
                             return Err(Box::new(std::io::Error::new(
                                 std::io::ErrorKind::InvalidData,
