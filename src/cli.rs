@@ -47,15 +47,17 @@ pub fn build_cli() -> Command {
             Arg::new("tail")
                 .short('t')
                 .long("tail")
-                .help("Prints the bottom ten rows of data.")
-                .action(ArgAction::SetTrue),
+                .help("Prints the bottom <N> rows of data.")
+                .num_args(1)
+                .value_name("N"),
         )
         .arg(
             Arg::new("head")
                 .short('H')
                 .long("head")
-                .help("Prints the top ten rows of data and the column names.")
-                .action(ArgAction::SetTrue),
+                .help("Prints the top <N> rows of data and the column names.")
+                .num_args(1)
+                .value_name("N"),
         )
         .arg(
             Arg::new("schema")

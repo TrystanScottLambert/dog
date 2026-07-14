@@ -74,14 +74,26 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             }
         }
 
+        if let Some(header_rows) = matches.get_one::<String>("head") {
+            let no_rows: u32 = match header_rows.trim().parse() {
+                Ok(no_row) => no_row,
+                Err(_) => anyhow::bail!("'Number of rows' should be an integer."),
+            };
+            print_head(&mut lazy_frame, no_rows)?;
+        }
+
+        if let Some(tail_rows) = matches.get_one::<String>("tail") {
+            let no_rows: u32 = match tail_rows.trim().parse() {
+                Ok(no_row) => no_row,
+                Err(_) => anyhow::bail!("'Number of rows' should be an integer."),
+            };
+            print_tail(&lazy_frame, no_rows)?;
+        }
+
         if *matches.get_one::<bool>("names").unwrap_or(&false) {
             print_column_names(&mut lazy_frame)?;
         } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
             print_only_data(lazy_frame, false)?;
-        } else if *matches.get_one::<bool>("tail").unwrap_or(&false) {
-            print_tail(lazy_frame)?;
-        } else if *matches.get_one::<bool>("head").unwrap_or(&false) {
-            print_head(&mut lazy_frame)?;
         } else if *matches.get_one::<bool>("stats").unwrap_or(&false) {
             print_stats(lazy_frame)?;
         } else if *matches.get_one::<bool>("schema").unwrap_or(&false) {

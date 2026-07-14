@@ -82,15 +82,15 @@ fn print_catlike(lazy_frame: LazyFrame) -> Result<()> {
     Ok(())
 }
 
-pub fn print_tail(lazy_frame: LazyFrame) -> Result<()> {
-    let tail = lazy_frame.tail(10);
+pub fn print_tail(lazy_frame: &LazyFrame, number_of_rows: u32) -> Result<()> {
+    let tail = lazy_frame.clone().tail(number_of_rows);
     print_catlike(tail)?;
     Ok(())
 }
 
-pub fn print_head(lazy_frame: &mut LazyFrame) -> Result<()> {
+pub fn print_head(lazy_frame: &mut LazyFrame, number_of_rows: u32) -> Result<()> {
     let head_frame = lazy_frame.clone();
-    let head = head_frame.limit(10);
+    let head = head_frame.limit(number_of_rows);
     print_column_names(lazy_frame)?;
     print_catlike(head)?;
     Ok(())
