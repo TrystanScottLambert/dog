@@ -9,6 +9,7 @@ pub fn build_cli() -> Command {
             Arg::new("file")
                 .required(true)
                 .index(1) // this will always be the first positional argument
+                .num_args(1..)
                 .help("Input parquet file."),
         )
         .arg(
