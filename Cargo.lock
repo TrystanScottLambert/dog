@@ -696,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "dog-tsl"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "assert_cmd",

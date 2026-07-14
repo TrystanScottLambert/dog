@@ -1,6 +1,6 @@
 [package]
 name = "dog-tsl"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 readme = "README.md"
 description = "A fast cli tool for viewing and handling parquet and other file formats."
