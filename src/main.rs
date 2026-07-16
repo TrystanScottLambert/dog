@@ -1,6 +1,6 @@
 mod cli;
 mod filter;
-mod maml_footer;
+mod footer;
 mod printer;
 mod reader;
 mod write;
@@ -8,9 +8,9 @@ mod write;
 use std::path::PathBuf;
 
 use crate::filter::parse_selection_string;
-use crate::maml_footer::write_waves_metadata;
+use crate::footer::write_waves_metadata;
 use crate::printer::*;
-use crate::reader::{read_file, read_yaml, which_file, FileType};
+use crate::reader::{read_file, which_file, FileType};
 use crate::write::write_parquet;
 use anyhow::Result;
 use clap::ArgMatches;
@@ -27,17 +27,26 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             anyhow::bail!("No file follows glob pattern '{}'", file_path.display());
         }
 
-        if let Some(maml_file) = matches.get_one::<String>("insert-maml") {
-            let maml = read_yaml(PathBuf::from(maml_file))?;
+        if let Some(meta_args) = matches.get_many::<String>("insert-metadata") {
+            let mut arguments = meta_args.map(|f| f.to_string());
+            let meta_file = PathBuf::from(arguments.next().unwrap());
+            let keyword = arguments.next().unwrap();
+            if !meta_file.exists() {
+                anyhow::bail!("meta file '{}' does not exist", meta_file.display());
+            }
+
+            let maml = std::fs::read_to_string(meta_file)?;
             let force = matches.get_flag("force");
-            if !force && check_for_maml_metadata(&file_path)? {
+            if !force && check_for_keyword_metadata(&file_path, &keyword)? {
                 anyhow::bail!(
-                "{} already contains MAML metadata; pass -F to overwrite; run `dog -w {}` to view.",
+                "{} already contains '{}' keyword-metadata; pass -F to overwrite; run `dog -w {} {}` to view.",
                 file_path.display(),
+                keyword,
+                keyword,
                 file_path.display()
             );
             }
-            write_waves_metadata(&file_path, &maml)?;
+            write_waves_metadata(&file_path, &maml, &keyword)?;
             return Ok(());
         }
 
@@ -90,6 +99,10 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             print_tail(&lazy_frame, no_rows)?;
         }
 
+        if let Some(keyword) = matches.get_one::<String>("keyword") {
+            print_keyword_metadata(&file_path, keyword)?;
+        }
+
         if *matches.get_one::<bool>("names").unwrap_or(&false) {
             print_column_names(&mut lazy_frame)?;
         } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
@@ -98,8 +111,6 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             print_stats(lazy_frame)?;
         } else if *matches.get_one::<bool>("schema").unwrap_or(&false) {
             print_schema(lazy_frame)?;
-        } else if *matches.get_one::<bool>("maml").unwrap_or(&false) {
-            print_waves_metadata(&file_path)?;
         } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
             print_summary(lazy_frame)?;
         } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {

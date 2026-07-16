@@ -15,11 +15,40 @@ fn copy_test_files() -> (TempDir, PathBuf, PathBuf) {
 }
 
 #[test]
+fn markdown() {
+    let dir = tempdir().expect("failed to create temp dir");
+    let markdown_path = dir.path().join("test.md");
+    let parquet_path = dir.path().join("test.parquet");
+    fs::copy("tests/fixtures/test.md", &markdown_path).expect("Failed to copy test.md file.");
+    fs::copy("tests/fixtures/test.parquet", &parquet_path)
+        .expect("Failed to copy test.parquet file");
+
+    let mut cmd = Command::cargo_bin("dog").unwrap();
+    cmd.arg("--insert-metadata")
+        .arg(&markdown_path)
+        .arg("markdown")
+        .arg(&parquet_path)
+        .assert()
+        .success();
+
+    let mut cmd = Command::cargo_bin("dog").unwrap();
+    cmd.arg(&parquet_path).assert().success();
+
+    let mut cmd = Command::cargo_bin("dog").unwrap();
+    cmd.arg("-k")
+        .arg("markdown")
+        .arg(&parquet_path)
+        .assert()
+        .success();
+}
+
+#[test]
 fn no_maml_exist() {
     let (_dir, parquet, maml) = copy_test_files();
     let mut cmd = Command::cargo_bin("dog").unwrap();
-    cmd.arg("--insert-maml")
+    cmd.arg("--insert-metadata")
         .arg(&maml)
+        .arg("maml")
         .arg(&parquet)
         .assert()
         .success();
@@ -32,15 +61,17 @@ fn no_maml_exist() {
 fn maml_exists_without_force_fails() {
     let (_dir, parquet, maml) = copy_test_files();
     let mut cmd = Command::cargo_bin("dog").unwrap();
-    cmd.arg("--insert-maml")
+    cmd.arg("--insert-metadata")
         .arg(&maml)
+        .arg("maml")
         .arg(&parquet)
         .assert()
         .success();
 
     let mut cmd = Command::cargo_bin("dog").unwrap();
-    cmd.arg("--insert-maml")
+    cmd.arg("--insert-metadata")
         .arg(&maml)
+        .arg("maml")
         .arg(&parquet)
         .assert()
         .failure();
@@ -50,15 +81,17 @@ fn maml_exists_without_force_fails() {
 fn maml_exists_with_force() {
     let (_dir, parquet, maml) = copy_test_files();
     let mut cmd = Command::cargo_bin("dog").unwrap();
-    cmd.arg("--insert-maml")
+    cmd.arg("--insert-metadata")
         .arg(&maml)
+        .arg("maml")
         .arg(&parquet)
         .assert()
         .success();
 
     let mut cmd = Command::cargo_bin("dog").unwrap();
-    cmd.arg("--insert-maml")
+    cmd.arg("--insert-metadata")
         .arg(&maml)
+        .arg("maml")
         .arg("-F")
         .arg(&parquet)
         .assert()
