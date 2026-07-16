@@ -70,9 +70,9 @@ pub fn build_cli() -> Command {
             Arg::new("columns")
                 .short('c')
                 .long("columns")
-                .help("Prints only the selected <COLUMNS> by name. Multiple <COLUMNS> can be comma separated.")
+                .help("Prints only the selected <COLUMN> by name. Multiple columns can be comma separated.")
                 .num_args(1)
-                .value_name("COLUMN(S)")
+                .value_name("COLUMN")
                 .conflicts_with_all(["convert", "insert-metadata", "schema", "keyword"])
                 .value_delimiter(','),
         )
