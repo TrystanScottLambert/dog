@@ -60,7 +60,11 @@ impl TryFrom<u8> for ThriftID {
 
 /// Insert/replace the `maml` key in `output_path`'s footer, in place.
 /// This is the custom waves maml function. But we could upsert to be generalized in the future
-pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
+pub fn write_waves_metadata(
+    output_path: &PathBuf,
+    file_contents: &str,
+    keyword: &str,
+) -> Result<()> {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -91,7 +95,7 @@ pub fn write_waves_metadata(output_path: &PathBuf, maml: &str) -> Result<()> {
     let mut blob = vec![0u8; usize::try_from(metadata_len)?];
     file.seek(SeekFrom::Start(footer_start))?;
     file.read_exact(&mut blob)?;
-    let new_blob = upsert_kv(&blob, "maml", maml)?;
+    let new_blob = upsert_kv(&blob, keyword, file_contents)?;
 
     // Overwrite only the tail, starting exactly where the old footer began.
     file.seek(SeekFrom::Start(footer_start))?;
