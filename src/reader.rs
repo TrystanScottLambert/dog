@@ -209,6 +209,3 @@ pub fn read_file(file_name: PathBuf) -> Result<LazyFrame> {
     }
 }
 
-pub fn read_yaml(file_name: PathBuf) -> Result<String> {
-    Ok(std::fs::read_to_string(file_name)?)
-}
