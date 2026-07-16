@@ -10,7 +10,8 @@ pub fn build_cli() -> Command {
                 .required(true)
                 .index(1) // this will always be the first positional argument
                 .num_args(1..)
-                .help("Input parquet file."),
+                .value_name("FILE")
+                .help("Input <FILE>."),
         )
         .arg(
             Arg::new("names")
@@ -29,19 +30,19 @@ pub fn build_cli() -> Command {
                 .conflicts_with("names"),
         )
         .arg(
-            Arg::new("insert-maml")
-                .long("insert-maml")
-                .help("Inserts MAML metadata from the given .maml file into the parquet file.")
-                .num_args(1)
-                .value_name("maml_file"),
+            Arg::new("insert-metadata")
+                .long("insert-metadata")
+                .help("Inserts contents of a file a <METADATA-FILE> into the parquet file at a given <KEYWORD> header position.")
+                .num_args(2)
+                .value_names(["METADATA-FILE", "KEYWORD"]),
         )
         .arg(
             Arg::new("force")
                 .short('F')
                 .long("force")
-                .help("Overwrite existing MAML metadata if it is already present.")
+                .help("Overwrite existing keyword metadata if it is already present.")
                 .action(ArgAction::SetTrue)
-                .requires("insert-maml"),
+                .requires("insert-metadata"),
         )
         .arg(
             Arg::new("tail")
@@ -71,7 +72,7 @@ pub fn build_cli() -> Command {
                 .long("columns")
                 .help("Prints only the selected columns by name.")
                 .num_args(1)
-                .conflicts_with_all(["convert", "insert-maml", "schema", "maml"])
+                .conflicts_with_all(["convert", "insert-metadata", "schema", "keyword"])
                 .value_delimiter(','),
         )
         .arg(
@@ -89,11 +90,12 @@ pub fn build_cli() -> Command {
                 .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::new("maml")
-                .short('w')
-                .long("maml")
-                .help("Print the MAML metadata if it exists.")
-                .action(ArgAction::SetTrue),
+            Arg::new("keyword")
+                .short('k')
+                .long("keyword")
+                .help("Print the <KEYWORD> metadata if it exists.")
+                .num_args(1)
+                .value_name("KEYWORD")
         )
         .arg(
             Arg::new("stats")
@@ -111,18 +113,18 @@ pub fn build_cli() -> Command {
             Arg::new("filter")
                 .long("filter")
                 .short('f')
-                .help("Filter rows based on some selection. E.g. ra<10")
+                .help("Filter rows based on some <SQL-STATEMENT>. E.g. ra<10.")
                 .num_args(1)
-                .value_name("sql-like row selection")
-                .conflicts_with_all(["convert", "insert-maml", "schema", "maml"]),
+                .value_name("SQL-STATEMENT")
+                .conflicts_with_all(["convert", "insert-metadata", "schema", "keyword"]),
         )
         .arg(
             Arg::new("outfile")
                 .long("outfile")
                 .short('o')
-                .help("Save the current selection to the outfile")
+                .help("Save the current selection to the <OUTFILE>.")
                 .num_args(1)
-                .value_name("outfile-name"),
+                .value_name("OUTFILE"),
         )
         .group(
             ArgGroup::new("mode")
@@ -132,11 +134,11 @@ pub fn build_cli() -> Command {
                     "tail",
                     "head",
                     "convert",
-                    "insert-maml",
+                    "insert-metadata",
                     "summary",
                     "peak",
                     "stats",
-                    "maml",
+                    "keyword",
                     "schema",
                     "outfile",
                 ])
