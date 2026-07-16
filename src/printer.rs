@@ -23,19 +23,21 @@ pub fn print_schema(lazy_frame: LazyFrame) -> Result<()> {
     println!("{:#?}", schema);
     Ok(())
 }
-pub fn check_for_maml_metadata(file_name: &PathBuf) -> Result<bool> {
+
+pub fn check_for_keyword_metadata(file_name: &PathBuf, keyword: &str) -> Result<bool> {
     let file = File::open(file_name)?;
     let mut reader = ParquetReader::new(file);
     if let Some(kv_metadata) = reader.get_metadata()?.key_value_metadata() {
         for kv in kv_metadata {
-            if kv.key == "maml" {
+            if kv.key == keyword {
                 return Ok(true);
             }
         }
     }
     Ok(false)
 }
-pub fn print_waves_metadata(file_name: &PathBuf) -> Result<()> {
+
+pub fn print_keyword_metadata(file_name: &PathBuf, keyword: &str) -> Result<()> {
     let file = File::open(file_name)?;
     let mut reader = ParquetReader::new(file);
 
@@ -43,7 +45,7 @@ pub fn print_waves_metadata(file_name: &PathBuf) -> Result<()> {
     if let Some(kv_metadata) = reader.get_metadata()?.key_value_metadata() {
         // Look for keyword maml
         for kv in kv_metadata {
-            if kv.key == "maml" {
+            if kv.key == keyword {
                 if let Some(value) = &kv.value {
                     println!("{}", value);
                     return Ok(());
