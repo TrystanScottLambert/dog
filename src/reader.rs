@@ -1,4 +1,4 @@
-use fitsio_pure::compat::fitsfile::FitsFile;
+use fitsio_pure_tsl::compat::fitsfile::FitsFile;
 use polars::prelude::*;
 use polars::{frame::DataFrame};
 use std::path::{PathBuf, Path};
