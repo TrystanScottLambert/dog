@@ -101,6 +101,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
 
         if let Some(keyword) = matches.get_one::<String>("keyword") {
             print_keyword_metadata(&file_path, keyword)?;
+            return Ok(());
         }
 
         if *matches.get_one::<bool>("names").unwrap_or(&false) {
