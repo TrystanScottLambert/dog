@@ -32,14 +32,14 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             let meta_file = PathBuf::from(arguments.next().unwrap());
             let keyword = arguments.next().unwrap();
             if !meta_file.exists() {
-                bail!("meta file '{}' does not exist", meta_file.display());
+                bail!("The file: '{}', does not exist", meta_file.display());
             }
 
             let maml = std::fs::read_to_string(meta_file)?;
             let force = matches.get_flag("force");
             if !force && check_for_keyword_metadata(&file_path, &keyword)? {
                 bail!(
-                "{} already contains '{}' keyword-metadata; pass -F to overwrite; run `dog -w {} {}` to view.",
+                "The file: '{}', already contains the keyword: '{}'!; pass -F to overwrite; run `dog -w {} {}` to view.",
                 file_path.display(),
                 keyword,
                 keyword,
@@ -53,7 +53,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         if let Some(keyword) = matches.get_one::<String>("delete-kw-metadata") {
             if !check_for_keyword_metadata(&file_path, keyword)? {
                 eprintln!(
-                    "File name '{}' does not have a keyword '{}' in it's metadata. run `dog --list-keywords {}` to list current keywords",
+                    "The file: '{}', does not have the keyword: '{}', in it's metadata. Run `dog --list-keywords {}` to list current keywords",
                     file_path.display(),
                     keyword,
                     file_path.display(),
