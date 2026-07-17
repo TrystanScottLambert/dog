@@ -60,7 +60,7 @@ impl TryFrom<u8> for ThriftID {
 
 /// Insert/replace the `maml` key in `output_path`'s footer, in place.
 /// This is the custom waves maml function. But we could upsert to be generalized in the future
-pub fn write_waves_metadata(
+pub fn write_keyword_metadata(
     output_path: &PathBuf,
     file_contents: &str,
     keyword: &str,
@@ -156,6 +156,92 @@ fn upsert_kv(metadata_blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
 
         skip_value(metadata_blob, &mut pos, type_id)?;
     }
+}
+
+/// Walk the top-level `FileMetaData` fields and rebuilds, ignoring `key`
+fn delete_kv(metadata_blob: &[u8], key: &str) -> Result<Vec<u8>> {
+    let mut pos = 0usize;
+    let mut last_id = 0i64;
+
+    loop {
+        let field_start = pos;
+        let (type_id, field_id) = read_field_header(metadata_blob, &mut pos, &mut last_id)?;
+
+        if let ThriftID::Stop = type_id {
+            bail!("No keyword metadata. Nothing to delete.")
+        }
+
+        if field_id == KEY_VALUE_FIELD_ID {
+            if type_id != ThriftID::List {
+                bail!("key_value_metadata is not a list (thrift type {type_id:?})");
+            }
+            let (elem_type, count) = read_collection_header(metadata_blob, &mut pos)?;
+            if count > 0 && elem_type != ThriftID::Struct {
+                bail!("key_value_metadata elements are not structs");
+            }
+            let mut pairs = Vec::with_capacity(usize::try_from(count)? + 1);
+            for _ in 0..count {
+                pairs.push(parse_key_value(metadata_blob, &mut pos)?);
+            }
+            let list_end = pos; // first byte after the list = next field header
+
+            pairs.retain(|(k, _)| k != key);
+
+            let field = encode_kv_field(&pairs);
+            let mut out = Vec::with_capacity(metadata_blob.len() + field.len());
+            out.extend_from_slice(&metadata_blob[..field_start]); // fields before field 5
+            out.extend_from_slice(&field); // freshly encoded field 5 (long-form header)
+            out.extend_from_slice(&metadata_blob[list_end..]); // fields after field 5 + STOP
+            return Ok(out);
+        }
+
+        skip_value(metadata_blob, &mut pos, type_id)?;
+    }
+}
+
+pub fn delete_keyword_metadata(output_path: &PathBuf, keyword: &str) -> Result<()> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(output_path)?;
+    let file_len = file.metadata()?.len();
+    if file_len < 12 {
+        bail!(
+            "{}: not a parquet file (smaller than 12 bytes)",
+            output_path.display()
+        );
+    }
+
+    // Last 8 bytes: [metadata_len u32 LE][PAR1].
+    let mut tail = [0u8; 8];
+    file.seek(SeekFrom::End(-8))?;
+    file.read_exact(&mut tail)?;
+    if &tail[4..] != MAGIC {
+        bail!(
+            "{}: missing PAR1 footer magic (encrypted or non-parquet?)",
+            output_path.display()
+        );
+    }
+    let metadata_len = u64::from(u32::from_le_bytes(tail[..4].try_into().unwrap()));
+    let footer_start = file_len
+        .checked_sub(8 + metadata_len)
+        .ok_or_else(|| anyhow!("declared footer length exceeds file size"))?;
+
+    let mut blob = vec![0u8; usize::try_from(metadata_len)?];
+    file.seek(SeekFrom::Start(footer_start))?;
+    file.read_exact(&mut blob)?;
+    let new_blob = delete_kv(&blob, keyword)?;
+
+    // Overwrite only the tail, starting exactly where the old footer began.
+    file.seek(SeekFrom::Start(footer_start))?;
+    file.write_all(&new_blob)?;
+    file.write_all(&(u32::try_from(new_blob.len())?).to_le_bytes())?;
+    file.write_all(MAGIC)?;
+
+    // The new footer may be shorter or longer than the old one; set exact length.
+    file.set_len(footer_start + new_blob.len() as u64 + 8)?;
+    file.sync_all()?;
+    Ok(())
 }
 
 /// Encode a complete `FileMetaData` field 5 from pairs. Uses the long-form

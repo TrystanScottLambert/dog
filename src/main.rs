@@ -8,7 +8,7 @@ mod write;
 use std::path::PathBuf;
 
 use crate::filter::parse_selection_string;
-use crate::footer::write_waves_metadata;
+use crate::footer::{delete_keyword_metadata, write_keyword_metadata};
 use crate::printer::*;
 use crate::reader::{read_file, which_file, FileType};
 use crate::write::write_parquet;
@@ -46,7 +46,21 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
                 file_path.display()
             );
             }
-            write_waves_metadata(&file_path, &maml, &keyword)?;
+            write_keyword_metadata(&file_path, &maml, &keyword)?;
+            continue;
+        }
+
+        if let Some(keyword) = matches.get_one::<String>("delete-kw-metadata") {
+            if !check_for_keyword_metadata(&file_path, keyword)? {
+                eprintln!(
+                    "File name '{}' does not have a keyword '{}' in it's metadata. run `dog --list-keywords {}` to list current keywords",
+                    file_path.display(),
+                    keyword,
+                    file_path.display(),
+                )
+            } else {
+                delete_keyword_metadata(&file_path, keyword)?;
+            }
             continue;
         }
 
