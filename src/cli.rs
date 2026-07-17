@@ -84,7 +84,7 @@ pub fn build_cli() -> Command {
         .arg(
             Arg::new("insert-metadata")
                 .long("insert-metadata")
-                .help("Inserts contents of a file a <METADATA-FILE> into the parquet file at a given <KEYWORD> header position.")
+                .help("Inserts contents of a <METADATA-FILE> into the parquet file at a given <KEYWORD> header position.")
                 .num_args(2)
                 .value_names(["METADATA-FILE", "KEYWORD"]),
         )
@@ -105,7 +105,7 @@ pub fn build_cli() -> Command {
         .arg(
             Arg::new("delete-kw-metadata")
             .long("delete-keyword")
-            .help("Deletes the fiven <KEYWORD> metadata from the header if it exists.")
+            .help("Deletes the given <KEYWORD> metadata from the header if it exists.")
             .num_args(1)
             .value_name("KEYWORD")
         )
