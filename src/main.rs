@@ -21,6 +21,13 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         .get_many::<String>("file")
         .expect("File argument missing");
 
+    if files.len() > 1 && matches.contains_id("outfile") {
+        bail!(
+            "--outfile takes a single input file; {} were given.",
+            files.len()
+        );
+    }
+
     for file in files {
         let file_path = PathBuf::from(file);
         if !file_path.exists() {
