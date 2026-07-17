@@ -97,13 +97,13 @@ pub fn build_cli() -> Command {
                 .value_name("KEYWORD")
         )
         .arg(
-            Arg::new("list-keyword-metadata")
-            .long("list-keyword")
+            Arg::new("list-kw-metadata")
+            .long("list-keywords")
             .help("Lists the keyword metadata of the given parquet file")
             .action(ArgAction::SetTrue)
         )
         .arg(
-            Arg::new("delete-keyword-metadata")
+            Arg::new("delete-kw-metadata")
             .long("delete-keyword")
             .help("Deletes the fiven <KEYWORD> metadata from the header if it exists.")
             .num_args(1)
@@ -147,8 +147,8 @@ pub fn build_cli() -> Command {
                     "head",
                     "convert",
                     "insert-metadata",
-                    "delete-keyword-metadata",
-                    "list-keyword-metadata",
+                    "delete-kw-metadata",
+                    "list-kw-metadata",
                     "summary",
                     "peak",
                     "stats",
