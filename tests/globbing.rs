@@ -44,6 +44,66 @@ fn assert_keyword_matches(parquet: &PathBuf, keyword: &str, expected_file: &Path
     );
 }
 
+/// Returns stdout of a successful `dog` invocation as a String.
+fn stdout_of(args: &[&str]) -> String {
+    let output = Command::cargo_bin("dog")
+        .unwrap()
+        .env("NO_COLOR", "1")
+        .args(args)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    String::from_utf8(output).expect("stdout was not utf8")
+}
+
+/// True if `keyword` appears as its own line in `--list-keywords` output.
+fn lists_keyword(listed: &str, keyword: &str) -> bool {
+    listed.lines().any(|l| l.trim() == keyword)
+}
+
+/// `dog -p <file>` should always work on a non-corrupt parquet.
+fn assert_not_corrupted(parquet: &PathBuf) {
+    Command::cargo_bin("dog")
+        .unwrap()
+        .arg("-p")
+        .arg(parquet)
+        .assert()
+        .success();
+}
+
+/// Runs `dog <args...> <p1> <p2> ...` over every parquet in one invocation.
+fn run_over_all(args: &[&str], parquets: &[PathBuf]) -> assert_cmd::assert::Assert {
+    let mut cmd = Command::cargo_bin("dog").unwrap();
+    cmd.env("NO_COLOR", "1").args(args);
+    for p in parquets {
+        cmd.arg(p);
+    }
+    cmd.assert()
+}
+
+/// Inserts `keyword` into a single parquet.
+fn insert(meta: &PathBuf, keyword: &str, parquet: &PathBuf) {
+    Command::cargo_bin("dog")
+        .unwrap()
+        .arg("--insert-metadata")
+        .arg(meta)
+        .arg(keyword)
+        .arg(parquet)
+        .assert()
+        .success();
+}
+
+/// Inserts `keyword` into every parquet in one invocation.
+fn insert_over_all(meta: &PathBuf, keyword: &str, parquets: &[PathBuf]) {
+    run_over_all(
+        &["--insert-metadata", meta.to_str().unwrap(), keyword],
+        parquets,
+    )
+    .success();
+}
+
 #[test]
 fn glob_insert_maml_all_files() {
     let (_dir, parquets, maml) = copy_globbed_files(3);
@@ -147,5 +207,145 @@ fn glob_multiple_keywords_coexist() {
     for p in &parquets {
         assert_keyword_matches(p, "maml", &maml);
         assert_keyword_matches(p, "markdown", &markdown_path);
+    }
+}
+
+#[test]
+fn glob_list_keywords_covers_every_file() {
+    let (_dir, parquets, maml) = copy_globbed_files(3);
+    insert_over_all(&maml, "maml", &parquets);
+
+    // one invocation across all files should not blow up
+    run_over_all(&["--list-keywords"], &parquets).success();
+
+    // and each file individually should show the key
+    for p in &parquets {
+        let listed = stdout_of(&["--list-keywords", p.to_str().unwrap()]);
+        assert!(
+            lists_keyword(&listed, "maml"),
+            "'maml' missing from {}:\n{listed}",
+            p.display()
+        );
+    }
+}
+
+#[test]
+fn glob_delete_keyword_removes_from_every_file() {
+    let (_dir, parquets, maml) = copy_globbed_files(3);
+    insert_over_all(&maml, "maml", &parquets);
+
+    run_over_all(&["--delete-keyword", "maml"], &parquets).success();
+
+    for p in &parquets {
+        let listed = stdout_of(&["--list-keywords", p.to_str().unwrap()]);
+        assert!(
+            !lists_keyword(&listed, "maml"),
+            "'maml' survived delete in {}:\n{listed}",
+            p.display()
+        );
+        assert_not_corrupted(p);
+    }
+}
+
+#[test]
+fn glob_delete_missing_keyword_does_not_stop_the_run() {
+    let (_dir, parquets, maml) = copy_globbed_files(3);
+
+    // only the middle file gets the keyword
+    insert(&maml, "maml", &parquets[1]);
+
+    // deleting across the whole glob should warn on 1 and 3 but still do 2
+    run_over_all(&["--delete-keyword", "maml"], &parquets).success();
+
+    for p in &parquets {
+        let listed = stdout_of(&["--list-keywords", p.to_str().unwrap()]);
+        assert!(
+            !lists_keyword(&listed, "maml"),
+            "'maml' survived delete in {}:\n{listed}",
+            p.display()
+        );
+        assert_not_corrupted(p);
+    }
+}
+
+#[test]
+fn glob_get_keyword_missing_from_some_files_does_not_stop_the_run() {
+    let (_dir, parquets, maml) = copy_globbed_files(3);
+
+    // only the last file gets the keyword
+    insert(&maml, "maml", &parquets[2]);
+
+    // -k across the glob should skip the misses and still print the hit
+    let got = stdout_of(&[
+        "-k",
+        "maml",
+        parquets[0].to_str().unwrap(),
+        parquets[1].to_str().unwrap(),
+        parquets[2].to_str().unwrap(),
+    ]);
+    let expected = fs::read_to_string(&maml).unwrap();
+    assert_eq!(
+        got.trim_end(),
+        expected.trim_end(),
+        "-k over a partially-tagged glob did not return the one hit"
+    );
+
+    for p in &parquets {
+        assert_not_corrupted(p);
+    }
+}
+
+#[test]
+fn glob_delete_one_keyword_leaves_others_intact() {
+    let (dir, parquets, maml) = copy_globbed_files(3);
+    let markdown_path = dir.path().join("test.md");
+    fs::copy("tests/fixtures/test.md", &markdown_path).expect("Failed to copy test.md file.");
+
+    insert_over_all(&maml, "maml", &parquets);
+    insert_over_all(&markdown_path, "markdown", &parquets);
+
+    run_over_all(&["--delete-keyword", "maml"], &parquets).success();
+
+    for p in &parquets {
+        let listed = stdout_of(&["--list-keywords", p.to_str().unwrap()]);
+        assert!(
+            !lists_keyword(&listed, "maml"),
+            "'maml' survived in {}:\n{listed}",
+            p.display()
+        );
+        assert!(
+            lists_keyword(&listed, "markdown"),
+            "deleting 'maml' also removed 'markdown' from {}:\n{listed}",
+            p.display()
+        );
+        assert_keyword_matches(p, "markdown", &markdown_path);
+        assert_not_corrupted(p);
+    }
+}
+
+#[test]
+fn glob_round_trip_insert_list_delete_list() {
+    let (_dir, parquets, maml) = copy_globbed_files(3);
+
+    insert_over_all(&maml, "maml", &parquets);
+    for p in &parquets {
+        let listed = stdout_of(&["--list-keywords", p.to_str().unwrap()]);
+        assert!(lists_keyword(&listed, "maml"), "{}:\n{listed}", p.display());
+    }
+
+    run_over_all(&["--delete-keyword", "maml"], &parquets).success();
+    for p in &parquets {
+        let listed = stdout_of(&["--list-keywords", p.to_str().unwrap()]);
+        assert!(
+            !lists_keyword(&listed, "maml"),
+            "{}:\n{listed}",
+            p.display()
+        );
+    }
+
+    // and the files still read fine after the round trip
+    for p in &parquets {
+        assert_not_corrupted(p);
+        Command::cargo_bin("dog").unwrap().arg(p).assert().success();
     }
 }
