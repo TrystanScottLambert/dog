@@ -8,7 +8,7 @@ mod write;
 use std::path::PathBuf;
 
 use crate::filter::parse_selection_string;
-use crate::footer::write_waves_metadata;
+use crate::footer::{delete_keyword_metadata, write_keyword_metadata};
 use crate::printer::*;
 use crate::reader::{read_file, which_file, FileType};
 use crate::write::write_parquet;
@@ -21,6 +21,13 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         .get_many::<String>("file")
         .expect("File argument missing");
 
+    if files.len() > 1 && matches.contains_id("outfile") {
+        bail!(
+            "--outfile takes a single input file; {} were given.",
+            files.len()
+        );
+    }
+
     for file in files {
         let file_path = PathBuf::from(file);
         if !file_path.exists() {
@@ -32,21 +39,35 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             let meta_file = PathBuf::from(arguments.next().unwrap());
             let keyword = arguments.next().unwrap();
             if !meta_file.exists() {
-                bail!("meta file '{}' does not exist", meta_file.display());
+                bail!("The file: '{}', does not exist", meta_file.display());
             }
 
             let maml = std::fs::read_to_string(meta_file)?;
             let force = matches.get_flag("force");
             if !force && check_for_keyword_metadata(&file_path, &keyword)? {
                 bail!(
-                "{} already contains '{}' keyword-metadata; pass -F to overwrite; run `dog -w {} {}` to view.",
+                "The file: '{}', already contains the keyword: '{}'!; pass -F to overwrite; run `dog -w {} {}` to view.",
                 file_path.display(),
                 keyword,
                 keyword,
                 file_path.display()
             );
             }
-            write_waves_metadata(&file_path, &maml, &keyword)?;
+            write_keyword_metadata(&file_path, &maml, &keyword)?;
+            continue;
+        }
+
+        if let Some(keyword) = matches.get_one::<String>("delete-kw-metadata") {
+            if !check_for_keyword_metadata(&file_path, keyword)? {
+                eprintln!(
+                    "The file: '{}', does not have the keyword: '{}', in it's metadata. Run `dog --list-keywords {}` to list current keywords",
+                    file_path.display(),
+                    keyword,
+                    file_path.display(),
+                )
+            } else {
+                delete_keyword_metadata(&file_path, keyword)?;
+            }
             continue;
         }
 
@@ -115,6 +136,8 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             print_summary(lazy_frame)?;
         } else if matches.get_flag("peak") {
             peak(lazy_frame)?;
+        } else if matches.get_flag("list-kw-metadata") {
+            list_keyword_metadata(&file_path)?;
         } else if matches.get_flag("convert") {
             let outfile = match which_file(&file_path)? {
                 FileType::Csv => PathBuf::from(file.replace(".csv", "_converted.parquet")),

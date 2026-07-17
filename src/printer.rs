@@ -37,6 +37,20 @@ pub fn check_for_keyword_metadata(file_name: &PathBuf, keyword: &str) -> Result<
     Ok(false)
 }
 
+pub fn list_keyword_metadata(file_name: &PathBuf) -> Result<()> {
+    let file = File::open(file_name)?;
+    let mut reader = ParquetReader::new(file);
+    let kv_metadata = reader
+        .get_metadata()?
+        .key_value_metadata()
+        .as_ref()
+        .unwrap();
+    for key in kv_metadata {
+        println!("{}", key.key.bold().magenta());
+    }
+    Ok(())
+}
+
 pub fn print_keyword_metadata(file_name: &PathBuf, keyword: &str) -> Result<()> {
     let file = File::open(file_name)?;
     let mut reader = ParquetReader::new(file);

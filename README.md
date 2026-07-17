@@ -2,6 +2,30 @@
 
 ![Demo](.github/dog.gif)
 
+# Quick reference
+
+| Option | Arguments | Description |
+| --- | --- | --- |
+| *(none)* | | Prints the entire table with column names. |
+| `-d` `--data` | | Prints only the data, without the header. |
+| `-n` `--names` | | Prints only the column names. |
+| `-H` `--head` | `<N>` | Prints the top `<N>` rows of data and the column names. |
+| `-t` `--tail` | `<N>` | Prints the bottom `<N>` rows of data. |
+| `-c` `--columns` | `<COLUMN>` | Prints only the selected columns. Comma separated. |
+| `-f` `--filter` | `<SQL-STATEMENT>` | Selects rows with an sql-like statement. E.g. `'ra<10'`. |
+| `-o` `--outfile` | `<OUTFILE>` | Saves the current selection to `<OUTFILE>`. Requires `-c` or `-f`. |
+| `-s` `--summary` | | Prints the number of rows and columns and the first and last few values of each column. |
+| `-p` `--peak` | | Prints a small table in polars format. |
+| `--stats` | | Summary statistics for each column, depending on datatype. |
+| `--schema` | | Prints the metadata schema. |
+| `-k` `--keyword` | `<KEYWORD>` | Prints the `<KEYWORD>` metadata if it exists. |
+| `--list-keywords` | | Lists all keyword metadata in the file. |
+| `--insert-metadata` | `<METADATA-FILE> <KEYWORD>` | Inserts the contents of `<METADATA-FILE>` at the `<KEYWORD>` position. |
+| `--delete-keyword` | `<KEYWORD>` | Deletes the `<KEYWORD>` metadata if it exists. |
+| `-F` `--force` | | Overwrites existing keyword metadata. Only with `--insert-metadata`. |
+| `--convert` | | Converts a .csv or .fits file into a parquet. |
+
+All options take one or more files, so globs work: `dog -k maml *.parquet`.
 
 # Motivation
 Parquet is a relatively new, open source, file format from Apache which is becoming very popular and is already being adopted extensively within data intensive fields. It is a column-orientated format of storing data and benefits from a large amount of compression ([more information is available at the official apache parquet site](https://parquet.apache.org/)). 
@@ -224,34 +248,64 @@ The schema in the metadata of the parquet file can also be printed, but in this 
 dog --schema test_file.parquet
 ```
 
-### MAML metadata
-`dog` has specific support for "Meta YAML" or "MAML" (see: https://github.com/asgr/MAML). This is a structured metadata for astronomical surveys like [WAVES](https://wavesurvey.org/) and [4HS](https://4mosthemispheresurvey.github.io/). If this metadata exists then it can be viewed using the -w and --maml flags.
+### Keyword metadata
+Parquet files can store arbitrary key-value metadata in their footer, and `dog` can read, write, list, and delete these entries.
+
+`dog` has specific support for "Meta YAML" or "MAML" (see: https://github.com/asgr/MAML). This is a structured metadata for astronomical surveys like [WAVES](https://wavesurvey.org/) and [4HS](https://4mosthemispheresurvey.github.io/). If this metadata exists then it can be viewed with the `-k` `--keyword` flag by asking for the `maml` keyword.
 
 ```bash
-dog -w test_file.parquet
-dog --maml test_file.parquet
+dog -k maml test_file.parquet
 ```
 This is a useful way to strip MAML metadata from a parquet file
 ```bash
-dog -w test_file.parquet > test.maml
+dog -k maml test_file.parquet > test.maml
 ```
+The same flag works for any keyword, not just `maml`. If the keyword isn't in the file then nothing is printed and a warning is given.
 
-Users can also insert maml files directly into parquet files. Though consider if this is what you really want to do; usually this step would be done officially at some point and inserting the maml runs the risk of overwriting valid metadata and even corruption.
+#### Inserting metadata
+Users can insert the contents of any text file into a parquet file under a keyword of their choosing. Though consider if this is what you really want to do; usually this step would be done officially at some point and inserting metadata runs the risk of overwriting valid metadata and even corruption.
 
-Say we have a parquet file, "galaxies.parquet" that does not have any maml stored in it and we've built a maml file "galaxies_meta.maml". Then we can insert the "galaxies_meta.maml" contents into the parquet file:
-
-```
-dog --insert-maml galaxies_meta.maml galaxies.parquet
-```
-
-If the file already has a maml entry (like the above example does now) then you can forcefully overwrite it using the `-F` tag:
+The `--insert-metadata` flag takes the file to insert and the keyword to store it under, followed by the parquet file(s):
 
 ```
-dog -F --insert-maml different_galaxies_meta.maml galaxies.parquet
+dog --insert-metadata galaxies_meta.maml maml galaxies.parquet
+```
+
+Because the keyword is arbitrary, a file can hold as many entries as are useful. A markdown description of a table might go in alongside the maml:
+
+```
+dog --insert-metadata galaxies_description.md table_description galaxies.parquet
+```
+
+If the file already has an entry at that keyword (like the first example does now) then you can forcefully overwrite it using the `-F` tag:
+
+```
+dog -F --insert-metadata different_galaxies_meta.maml maml galaxies.parquet
 ```
 
 Else you will get an error.
 
+Multiple files can be given at once, which means globs work as expected. This will insert the same description into every parquet in the directory:
+
+```
+dog --insert-metadata survey_description.md rip_description *.parquet
+```
+
+#### Listing keywords
+To see which keywords a file actually has, use `--list-keywords`:
+
+```bash
+dog --list-keywords test_file.parquet
+```
+This prints every key in the file's key-value metadata, one per line. Note that this includes entries written by the tools that created the file (such as `ARROW:schema`) and not just those inserted by `dog`.
+
+#### Deleting a keyword
+A keyword and its contents can be removed with `--delete-keyword`:
+
+```bash
+dog --delete-keyword maml test_file.parquet
+```
+If the keyword isn't in the file then nothing is deleted and a warning is printed, so running this across a glob won't stop at the first file that happens to lack the keyword.
 
 
 ### Reading non-parquet and converting files
