@@ -115,6 +115,8 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             print_summary(lazy_frame)?;
         } else if matches.get_flag("peak") {
             peak(lazy_frame)?;
+        } else if matches.get_flag("list-kw-metadata") {
+            list_keyword_metadata(&file_path)?;
         } else if matches.get_flag("convert") {
             let outfile = match which_file(&file_path)? {
                 FileType::Csv => PathBuf::from(file.replace(".csv", "_converted.parquet")),
