@@ -1,5 +1,3 @@
-// cli manager
-
 use clap::{Arg, ArgAction, ArgGroup, Command};
 
 pub fn build_cli() -> Command {
@@ -28,13 +26,6 @@ pub fn build_cli() -> Command {
                 .help("Prints only the data.")
                 .action(ArgAction::SetTrue)
                 .conflicts_with("names"),
-        )
-        .arg(
-            Arg::new("insert-metadata")
-                .long("insert-metadata")
-                .help("Inserts contents of a file a <METADATA-FILE> into the parquet file at a given <KEYWORD> header position.")
-                .num_args(2)
-                .value_names(["METADATA-FILE", "KEYWORD"]),
         )
         .arg(
             Arg::new("force")
@@ -91,12 +82,32 @@ pub fn build_cli() -> Command {
                 .action(ArgAction::SetTrue),
         )
         .arg(
+            Arg::new("insert-metadata")
+                .long("insert-metadata")
+                .help("Inserts contents of a file a <METADATA-FILE> into the parquet file at a given <KEYWORD> header position.")
+                .num_args(2)
+                .value_names(["METADATA-FILE", "KEYWORD"]),
+        )
+        .arg(
             Arg::new("keyword")
                 .short('k')
                 .long("keyword")
                 .help("Print the <KEYWORD> metadata if it exists.")
                 .num_args(1)
                 .value_name("KEYWORD")
+        )
+        .arg(
+            Arg::new("list-keyword-metadata")
+            .long("list-keyword")
+            .help("Lists the keyword metadata of the given parquet file")
+            .action(ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("delete-keyword-metadata")
+            .long("delete-keyword")
+            .help("Deletes the fiven <KEYWORD> metadata from the header if it exists.")
+            .num_args(1)
+            .value_name("KEYWORD")
         )
         .arg(
             Arg::new("stats")
@@ -136,6 +147,8 @@ pub fn build_cli() -> Command {
                     "head",
                     "convert",
                     "insert-metadata",
+                    "delete-keyword-metadata",
+                    "list-keyword-metadata",
                     "summary",
                     "peak",
                     "stats",
