@@ -12,7 +12,7 @@ use crate::footer::write_waves_metadata;
 use crate::printer::*;
 use crate::reader::{read_file, which_file, FileType};
 use crate::write::write_parquet;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::ArgMatches;
 use polars::prelude::*;
 
@@ -24,7 +24,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
     for file in files {
         let file_path = PathBuf::from(file);
         if !file_path.exists() {
-            anyhow::bail!("No file follows glob pattern '{}'", file_path.display());
+            bail!("No file follows glob pattern '{}'", file_path.display());
         }
 
         if let Some(meta_args) = matches.get_many::<String>("insert-metadata") {
@@ -32,13 +32,13 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             let meta_file = PathBuf::from(arguments.next().unwrap());
             let keyword = arguments.next().unwrap();
             if !meta_file.exists() {
-                anyhow::bail!("meta file '{}' does not exist", meta_file.display());
+                bail!("meta file '{}' does not exist", meta_file.display());
             }
 
             let maml = std::fs::read_to_string(meta_file)?;
             let force = matches.get_flag("force");
             if !force && check_for_keyword_metadata(&file_path, &keyword)? {
-                anyhow::bail!(
+                bail!(
                 "{} already contains '{}' keyword-metadata; pass -F to overwrite; run `dog -w {} {}` to view.",
                 file_path.display(),
                 keyword,
@@ -47,7 +47,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             );
             }
             write_waves_metadata(&file_path, &maml, &keyword)?;
-            return Ok(());
+            continue;
         }
 
         let mut lazy_frame = read_file(file_path.clone())?;
@@ -64,7 +64,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         if let Some(filter_selection) = matches.get_one::<String>("filter") {
             let polars_expresion = match parse_selection_string(filter_selection) {
                 Ok(expr) => expr,
-                _ => anyhow::bail!(
+                _ => bail!(
                     "Error parsing the filter selection string: {}",
                     filter_selection
                 ),
@@ -76,17 +76,16 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         if let Some(outfile_name) = matches.get_one::<String>("outfile") {
             if rows_selected | columns_selected {
                 write_parquet(&lazy_frame, &PathBuf::from(outfile_name))?;
-
-                return Ok(());
+                continue;
             } else {
-                anyhow::bail!("File not saved. No columns or rows have been selected.")
+                bail!("File not saved. No columns or rows have been selected.")
             }
         }
 
         if let Some(header_rows) = matches.get_one::<String>("head") {
             let no_rows: u32 = match header_rows.trim().parse() {
                 Ok(no_row) => no_row,
-                Err(_) => anyhow::bail!("'Number of rows' should be an integer."),
+                Err(_) => bail!("'Number of rows' should be an integer."),
             };
             print_head(&mut lazy_frame, no_rows)?;
         }
@@ -94,29 +93,29 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         if let Some(tail_rows) = matches.get_one::<String>("tail") {
             let no_rows: u32 = match tail_rows.trim().parse() {
                 Ok(no_row) => no_row,
-                Err(_) => anyhow::bail!("'Number of rows' should be an integer."),
+                Err(_) => bail!("'Number of rows' should be an integer."),
             };
             print_tail(&lazy_frame, no_rows)?;
         }
 
         if let Some(keyword) = matches.get_one::<String>("keyword") {
             print_keyword_metadata(&file_path, keyword)?;
-            return Ok(());
+            continue;
         }
 
-        if *matches.get_one::<bool>("names").unwrap_or(&false) {
+        if matches.get_flag("names") {
             print_column_names(&mut lazy_frame)?;
-        } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
+        } else if matches.get_flag("data") {
             print_only_data(lazy_frame, false)?;
-        } else if *matches.get_one::<bool>("stats").unwrap_or(&false) {
+        } else if matches.get_flag("stats") {
             print_stats(lazy_frame)?;
-        } else if *matches.get_one::<bool>("schema").unwrap_or(&false) {
+        } else if matches.get_flag("schema") {
             print_schema(lazy_frame)?;
-        } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
+        } else if matches.get_flag("summary") {
             print_summary(lazy_frame)?;
-        } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
+        } else if matches.get_flag("peak") {
             peak(lazy_frame)?;
-        } else if *matches.get_one::<bool>("convert").unwrap_or(&false) {
+        } else if matches.get_flag("convert") {
             let outfile = match which_file(&file_path)? {
                 FileType::Csv => PathBuf::from(file.replace(".csv", "_converted.parquet")),
                 FileType::Fits => PathBuf::from(file.replace(".fits", "_converted.parquet")),
