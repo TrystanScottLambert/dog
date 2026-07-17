@@ -104,19 +104,19 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             return Ok(());
         }
 
-        if *matches.get_one::<bool>("names").unwrap_or(&false) {
+        if matches.get_flag("names") {
             print_column_names(&mut lazy_frame)?;
-        } else if *matches.get_one::<bool>("data").unwrap_or(&false) {
+        } else if matches.get_flag("data") {
             print_only_data(lazy_frame, false)?;
-        } else if *matches.get_one::<bool>("stats").unwrap_or(&false) {
+        } else if matches.get_flag("stats") {
             print_stats(lazy_frame)?;
-        } else if *matches.get_one::<bool>("schema").unwrap_or(&false) {
+        } else if matches.get_flag("schema") {
             print_schema(lazy_frame)?;
-        } else if *matches.get_one::<bool>("summary").unwrap_or(&false) {
+        } else if matches.get_flag("summary") {
             print_summary(lazy_frame)?;
-        } else if *matches.get_one::<bool>("peak").unwrap_or(&false) {
+        } else if matches.get_flag("peak") {
             peak(lazy_frame)?;
-        } else if *matches.get_one::<bool>("convert").unwrap_or(&false) {
+        } else if matches.get_flag("convert") {
             let outfile = match which_file(&file_path)? {
                 FileType::Csv => PathBuf::from(file.replace(".csv", "_converted.parquet")),
                 FileType::Fits => PathBuf::from(file.replace(".fits", "_converted.parquet")),
