@@ -8,7 +8,7 @@ mod write;
 use std::path::PathBuf;
 
 use crate::filter::parse_selection_string;
-use crate::footer::{delete_keyword_metadata, write_keyword_metadata};
+use crate::footer::{delete_keyword_metadata, write_keyword_metadata, ARROW_SCHEMA_KEY};
 use crate::printer::*;
 use crate::reader::{read_file, which_file, FileType};
 use crate::write::write_parquet;
@@ -28,6 +28,10 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         );
     }
 
+    // Set when a file is skipped (e.g. a refused delete), so we can exit non-zero at the end
+    // without abandoning the remaining files.
+    let mut failed = false;
+
     for file in files {
         let file_path = PathBuf::from(file);
         if !file_path.exists() {
@@ -46,7 +50,7 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
             let force = matches.get_flag("force");
             if !force && check_for_keyword_metadata(&file_path, &keyword)? {
                 bail!(
-                "The file: '{}', already contains the keyword: '{}'!; pass -F to overwrite; run `dog -w {} {}` to view.",
+                "The file: '{}', already contains the keyword: '{}'!; pass -F to overwrite; run `dog -k {} {}` to view.",
                 file_path.display(),
                 keyword,
                 keyword,
@@ -60,11 +64,20 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         if let Some(keyword) = matches.get_one::<String>("delete-kw-metadata") {
             if !check_for_keyword_metadata(&file_path, keyword)? {
                 eprintln!(
-                    "The file: '{}', does not have the keyword: '{}', in it's metadata. Run `dog --list-keywords {}` to list current keywords",
+                    "The file: '{}', does not have the keyword: '{}', in its metadata. Run `dog --list-keywords {}` to list current keywords.",
                     file_path.display(),
                     keyword,
                     file_path.display(),
-                )
+                );
+                failed = true;
+            } else if keyword == ARROW_SCHEMA_KEY && !matches.get_flag("force") {
+                eprintln!(
+                    "'{}' is a reserved keyword. Deleting it can cause type information to be lost for columns. To delete it anyway: `dog -F --delete-keyword {} {}`",
+                    ARROW_SCHEMA_KEY,
+                    ARROW_SCHEMA_KEY,
+                    file_path.display()
+                );
+                failed = true;
             } else {
                 delete_keyword_metadata(&file_path, keyword)?;
             }
@@ -148,6 +161,10 @@ fn handle_arguments(matches: ArgMatches) -> Result<()> {
         } else {
             print_only_data(lazy_frame, true)?;
         }
+    }
+
+    if failed {
+        bail!("One or more files were not modified.");
     }
 
     Ok(())

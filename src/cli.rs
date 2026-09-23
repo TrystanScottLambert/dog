@@ -31,9 +31,9 @@ pub fn build_cli() -> Command {
             Arg::new("force")
                 .short('F')
                 .long("force")
-                .help("Overwrite existing keyword metadata if it is already present.")
+                .help("Overwrite existing keyword metadata, or allow deleting reserved keywords such as ARROW:schema.")
                 .action(ArgAction::SetTrue)
-                .requires("insert-metadata"),
+                .requires("footer-edit"),
         )
         .arg(
             Arg::new("tail")
@@ -158,4 +158,7 @@ pub fn build_cli() -> Command {
                 ])
                 .multiple(false),
         )
+        // The operations that edit the footer. -F is only meaningful alongside one of these.
+        // (Mutual exclusion is already enforced by "mode"; this group exists for `requires`.)
+        .group(ArgGroup::new("footer-edit").args(["insert-metadata", "delete-kw-metadata"]))
 }

@@ -24,7 +24,7 @@ const MAGIC: &[u8; 4] = b"PAR1";
 const KEY_VALUE_FIELD_ID: i64 = 5; // FileMetaData.key_value_metadata
 
 // Constants for ARROW:schema overwriting.
-const ARROW_SCHEMA_KEY: &str = "ARROW:schema";
+pub const ARROW_SCHEMA_KEY: &str = "ARROW:schema";
 const IPC_CONTINUATION: [u8; 4] = [0xFF; 4];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
