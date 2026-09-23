@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::{fs, path::PathBuf};
 use tempfile::{tempdir, TempDir};
 
@@ -247,20 +246,24 @@ fn delete_then_reinsert_without_force_succeeds() {
 }
 
 #[test]
-fn delete_missing_keyword_warns_but_succeeds() {
+fn delete_missing_keyword_fails() {
     let (_dir, parquet, _maml) = copy_test_files();
+    let before = std::fs::read(&parquet).unwrap();
 
     Command::cargo_bin("dog")
         .unwrap()
-        .env("NO_COLOR", "1")
         .arg("--delete-keyword")
         .arg("not_a_real_keyword")
         .arg(&parquet)
         .assert()
-        .success()
-        .stderr(predicate::str::contains("not_a_real_keyword"));
+        .failure()
+        .stderr(predicates::str::contains("does not have the keyword"))
+        .stderr(predicates::str::contains(
+            "One or more files were not modified",
+        ));
 
-    assert_not_corrupted(&parquet);
+    // a refused delete must leave the file byte-for-byte untouched
+    assert_eq!(std::fs::read(&parquet).unwrap(), before);
 }
 
 #[test]
