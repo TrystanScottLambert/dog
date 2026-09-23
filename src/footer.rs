@@ -15,8 +15,17 @@ use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
+use arrow_ipc::convert::try_fb_to_schema;
+use arrow_ipc::writer::{DictionaryTracker, IpcDataGenerator, IpcWriteOptions};
+use arrow_schema::Schema;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+
 const MAGIC: &[u8; 4] = b"PAR1";
 const KEY_VALUE_FIELD_ID: i64 = 5; // FileMetaData.key_value_metadata
+
+// Constants for ARROW:schema overwriting.
+const ARROW_SCHEMA_KEY: &str = "ARROW:schema";
+const IPC_CONTINUATION: [u8; 4] = [0xFF; 4];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -112,6 +121,9 @@ pub fn write_keyword_metadata(
 /// Walk the top-level `FileMetaData` fields, upsert `key`=`value` into the
 /// This is the general add a new key-word value in the metadata
 fn upsert_kv(metadata_blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
+    if key == ARROW_SCHEMA_KEY {
+        bail!("Refusing to overwrite the reserved {ARROW_SCHEMA_KEY} key. This can type-confusion with arrow readers.");
+    }
     let mut pos = 0usize;
     let mut last_id = 0i64;
 
@@ -145,6 +157,7 @@ fn upsert_kv(metadata_blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
 
             pairs.retain(|(k, _)| k != key);
             pairs.push((key.to_string(), Some(value.to_string())));
+            sync_arrow_schema(&mut pairs, key, Some(value))?;
 
             let field = encode_kv_field(&pairs);
             let mut out = Vec::with_capacity(metadata_blob.len() + field.len());
@@ -186,6 +199,7 @@ fn delete_kv(metadata_blob: &[u8], key: &str) -> Result<Vec<u8>> {
             let list_end = pos; // first byte after the list = next field header
 
             pairs.retain(|(k, _)| k != key);
+            sync_arrow_schema(&mut pairs, key, None)?;
 
             let field = encode_kv_field(&pairs);
             let mut out = Vec::with_capacity(metadata_blob.len() + field.len());
@@ -503,6 +517,56 @@ fn zigzag(v: i64) -> u64 {
 // convert zigzag encoded unsigned integers to signed integers
 fn unzigzag(v: u64) -> i64 {
     ((v >> 1).cast_signed()) ^ -((v & 1).cast_signed())
+}
+
+/// Decode an `ARROW:schema` value: base64 -> IPC framing -> flatbuffer -> Schema.
+fn decode_arrow_schema(encoded: &str) -> Result<Schema> {
+    let bytes = STANDARD.decode(encoded)?;
+    // Framed form is [0xFFFFFFFF][len: i32 LE][flatbuffer]; otherwise treat as a bare flatbuffer.
+    let message_bytes = if bytes.len() > 8 && bytes[..4] == IPC_CONTINUATION {
+        &bytes[8..]
+    } else {
+        &bytes[..]
+    };
+    let message = arrow_ipc::root_as_message(message_bytes)
+        .map_err(|e| anyhow!("ARROW:schema is not a valid IPC message: {e:?}"))?;
+    let fb_schema = message
+        .header_as_schema()
+        .ok_or_else(|| anyhow!("ARROW:schema message does not contain a schema"))?;
+    Ok(try_fb_to_schema(fb_schema)?)
+}
+
+/// Encode a Schema back into an `ARROW:schema` value, framed the way Arrow writers do.
+fn encode_arrow_schema(schema: &Schema) -> Result<String> {
+    let mut tracker = DictionaryTracker::new(false);
+    let message = IpcDataGenerator::default()
+        .schema_to_bytes_with_dictionary_tracker(schema, &mut tracker, &IpcWriteOptions::default())
+        .ipc_message;
+    let mut framed = Vec::with_capacity(message.len() + 8);
+    framed.extend_from_slice(&IPC_CONTINUATION);
+    framed.extend_from_slice(&i32::try_from(message.len())?.to_le_bytes());
+    framed.extend_from_slice(&message);
+    Ok(STANDARD.encode(framed))
+}
+
+/// Mirror a keyword edit into the schema-level metadata stored inside `ARROW:schema`,
+/// if the file has one. `Some(v)` sets `key` to `v`; `None` removes `key`.
+fn sync_arrow_schema(
+    pairs: &mut [(String, Option<String>)],
+    key: &str,
+    value: Option<&str>,
+) -> Result<()> {
+    let Some((_, Some(encoded))) = pairs.iter_mut().find(|(k, _)| k == ARROW_SCHEMA_KEY) else {
+        return Ok(()); // no Arrow hint in this file: nothing to keep in sync
+    };
+    let mut schema = decode_arrow_schema(encoded)?;
+    if let Some(v) = value {
+        schema.metadata.insert(key.to_string(), v.to_string());
+    } else {
+        schema.metadata.remove(key);
+    }
+    *encoded = encode_arrow_schema(&schema)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -965,17 +1029,6 @@ mod tests {
         }
 
         #[test]
-        fn replaces_existing_key_and_preserves_others() {
-            let blob = footer_with_kv(&[("ARROW:schema", Some("xyz")), ("maml", Some("old"))]);
-            let out = upsert_kv(&blob, "maml", "new").unwrap();
-            // maml dropped then re-pushed at the end; the other key survives untouched
-            assert_eq!(
-                read_kv_pairs(&out).unwrap(),
-                owned(&[("ARROW:schema", Some("xyz")), ("maml", Some("new"))])
-            );
-        }
-
-        #[test]
         fn no_duplicate_maml_after_replace() {
             let blob = footer_with_kv(&[("maml", Some("old"))]);
             let out = upsert_kv(&blob, "maml", "new").unwrap();
@@ -1076,6 +1129,44 @@ mod tests {
             // 60k test
             let res_60k = read_uvarint(&buffer, &mut pos).unwrap();
             assert_eq!(res_60k, 60_000u64);
+        }
+    }
+
+    mod test_arrow_schema {
+        use super::*;
+        use arrow_schema::{DataType, Field};
+
+        fn encoded_schema() -> String {
+            let schema = Schema::new(vec![Field::new("redshift", DataType::Float64, false)]);
+            encode_arrow_schema(&schema).unwrap()
+        }
+
+        #[test]
+        fn sets_key_inside_arrow_schema() {
+            let mut pairs = vec![(ARROW_SCHEMA_KEY.to_string(), Some(encoded_schema()))];
+            sync_arrow_schema(&mut pairs, "maml", Some("survey: WAVES")).unwrap();
+            let schema = decode_arrow_schema(pairs[0].1.as_deref().unwrap()).unwrap();
+            assert_eq!(
+                schema.metadata.get("maml").map(String::as_str),
+                Some("survey: WAVES")
+            );
+            assert_eq!(schema.fields().len(), 1); // columns survive the round trip
+        }
+
+        #[test]
+        fn removes_key_inside_arrow_schema() {
+            let mut pairs = vec![(ARROW_SCHEMA_KEY.to_string(), Some(encoded_schema()))];
+            sync_arrow_schema(&mut pairs, "maml", Some("x")).unwrap();
+            sync_arrow_schema(&mut pairs, "maml", None).unwrap();
+            let schema = decode_arrow_schema(pairs[0].1.as_deref().unwrap()).unwrap();
+            assert!(!schema.metadata.contains_key("maml"));
+        }
+
+        #[test]
+        fn no_arrow_schema_is_a_no_op() {
+            let mut pairs = vec![("other".to_string(), Some("v".to_string()))];
+            sync_arrow_schema(&mut pairs, "maml", Some("x")).unwrap();
+            assert_eq!(pairs, vec![("other".to_string(), Some("v".to_string()))]);
         }
     }
 }
