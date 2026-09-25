@@ -821,7 +821,7 @@ dependencies = [
  "base64 0.23.1",
  "clap",
  "colored",
- "fitsio-pure-tsl",
+ "fitsio-pure",
  "polars",
  "polars-buffer",
  "predicates",
@@ -909,10 +909,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 
 [[package]]
-name = "fitsio-pure-tsl"
-version = "0.0.1"
+name = "fitsio-pure"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b5441eca5ba3a79e2ae8b345ea62af12270fb536feb761fa9a0338bd3536735"
+checksum = "44fef90cc83c18160e0941a774aabeb38e04b50fbc67385d33d1f173e5fb10fe"
 dependencies = [
  "bytemuck",
  "libm",
