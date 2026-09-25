@@ -25,6 +25,9 @@ codegen-units = 1
 
 [dependencies]
 anyhow = "1.0.102"
+arrow-ipc = "60.0.0"
+arrow-schema = "60.0.0"
+base64 = "0.23.1"
 clap = { version = "4.6.1", features = ["derive"] }
 colored = "3.1.1"
 fitsio-pure-tsl = { version = "0.0.1", features = ["compat"] }

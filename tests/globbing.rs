@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::*;
 use std::{fs, path::PathBuf};
 use tempfile::{tempdir, TempDir};
 
@@ -254,16 +255,34 @@ fn glob_delete_missing_keyword_does_not_stop_the_run() {
     // only the middle file gets the keyword
     insert(&maml, "maml", &parquets[1]);
 
-    // deleting across the whole glob should warn on 1 and 3 but still do 2
-    run_over_all(&["--delete-keyword", "maml"], &parquets).success();
+    // snapshot the files that should be left alone
+    let before_1 = fs::read(&parquets[0]).unwrap();
+    let before_3 = fs::read(&parquets[2]).unwrap();
+
+    // deleting across the whole glob reports the misses on 1 and 3,
+    // still deletes from 2, and fails overall
+    run_over_all(&["--delete-keyword", "maml"], &parquets)
+        .failure()
+        .stderr(predicate::str::contains("test_1.parquet"))
+        .stderr(predicate::str::contains("test_3.parquet"))
+        .stderr(predicate::str::contains("test_2.parquet").not())
+        .stderr(predicate::str::contains(
+            "One or more files were not modified",
+        ));
+
+    // the delete actually happened on the tagged file
+    let listed = stdout_of(&["--list-keywords", parquets[1].to_str().unwrap()]);
+    assert!(
+        !lists_keyword(&listed, "maml"),
+        "'maml' survived delete in {}:\n{listed}",
+        parquets[1].display()
+    );
+
+    // the untagged files were never written to
+    assert_eq!(fs::read(&parquets[0]).unwrap(), before_1);
+    assert_eq!(fs::read(&parquets[2]).unwrap(), before_3);
 
     for p in &parquets {
-        let listed = stdout_of(&["--list-keywords", p.to_str().unwrap()]);
-        assert!(
-            !lists_keyword(&listed, "maml"),
-            "'maml' survived delete in {}:\n{listed}",
-            p.display()
-        );
         assert_not_corrupted(p);
     }
 }
