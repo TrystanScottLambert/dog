@@ -122,7 +122,7 @@ pub fn write_keyword_metadata(
 /// This is the general add a new key-word value in the metadata
 fn upsert_kv(metadata_blob: &[u8], key: &str, value: &str) -> Result<Vec<u8>> {
     if key == ARROW_SCHEMA_KEY {
-        bail!("Refusing to overwrite the reserved {ARROW_SCHEMA_KEY} key. This can type-confusion with arrow readers.");
+        bail!("Overwriting the reserved {ARROW_SCHEMA_KEY} key is not permitted. This can type-confusion with arrow readers.");
     }
     let mut pos = 0usize;
     let mut last_id = 0i64;
@@ -559,6 +559,9 @@ fn sync_arrow_schema(
     let Some((_, Some(encoded))) = pairs.iter_mut().find(|(k, _)| k == ARROW_SCHEMA_KEY) else {
         return Ok(()); // no Arrow hint in this file: nothing to keep in sync
     };
+    if cfg!(target_endian = "big") {
+        eprintln!("WARNING: system in big endian. Arrow schema crate does not gurantee correcteness for big-endian systems.");
+    }
     let mut schema = decode_arrow_schema(encoded)?;
     if let Some(v) = value {
         schema.metadata.insert(key.to_string(), v.to_string());

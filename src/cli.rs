@@ -159,6 +159,5 @@ pub fn build_cli() -> Command {
                 .multiple(false),
         )
         // The operations that edit the footer. -F is only meaningful alongside one of these.
-        // (Mutual exclusion is already enforced by "mode"; this group exists for `requires`.)
         .group(ArgGroup::new("footer-edit").args(["insert-metadata", "delete-kw-metadata"]))
 }
